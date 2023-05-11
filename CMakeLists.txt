@@ -24,7 +24,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 set(SOURCES src/lsbench.c src/lsbench-csr.c src/cusparse.c src/hypre.c
-  src/amgx.c src/cholmod.c src/paralmond.cpp)
+  src/amgx.c src/cholmod.c src/paralmond.cpp src/rocalution.cpp)
 
 add_library(lsbench SHARED ${SOURCES})
 target_include_directories(lsbench PRIVATE src)

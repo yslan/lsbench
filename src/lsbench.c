@@ -26,6 +26,8 @@ static lsbench_solver_t str_to_solver(const char *str) {
     return LSBENCH_SOLVER_CHOLMOD;
   } else if (strcmp(up, "PARALMOND") == 0) {
     return LSBENCH_SOLVER_PARALMOND;
+  } else if (strcmp(up, "ROCALUTION") == 0) {
+    return LSBENCH_SOLVER_ROCALUTION;
   } else {
     warnx("Invalid solver: \"%s\". Defaulting to CHOLMOD.", str);
     return LSBENCH_SOLVER_CHOLMOD;
@@ -142,6 +144,7 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
   amgx_init();
   cholmod_init();
   paralmond_init();
+  rocalution_init();
 
   return cb;
 }
@@ -155,13 +158,19 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
   double *r = tcalloc(double, m);
   double *x = tcalloc(double, m);
 
-  int seed = 27;
+  // initialize rhs, TODO: maybe make ||x||=1?
+  int seed = 27; // seed of the random  
   srand(seed);
   for (unsigned i = 0; i < m; i++)
-    r[i] = (double)rand() / RAND_MAX;
+    r[i] = (double) rand() / RAND_MAX;
   double tmp = l2norm(r, m);
   for (unsigned i = 0; i < m; i++)
-    r[i] / tmp;
+    r[i] = r[i] / tmp;
+  if (cb->verbose>1) {
+    tmp = l2norm(r,m);
+    printf("rhs initialized by rand() with seed = %d and RAND_MAX = %d\n",seed,RAND_MAX,tmp);
+  }
+
 
   switch (cb->solver) {
   case LSBENCH_SOLVER_CUSOLVER:
@@ -178,6 +187,9 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     break;
   case LSBENCH_SOLVER_PARALMOND:
     paralmond_bench(x, A, r, cb);
+    break;
+  case LSBENCH_SOLVER_ROCALUTION:
+    rocalution_bench(x, A, r, cb);
     break;
   default:
     errx(EXIT_FAILURE, "Unknown solver: %d.", cb->solver);
@@ -213,6 +225,7 @@ void lsbench_finalize(struct lsbench *cb) {
   amgx_finalize();
   cholmod_finalize();
   paralmond_finalize();
+  rocalution_finalize();
 
   if (cb)
     tfree(cb->matrix);
