@@ -33,9 +33,10 @@ ExternalProject_Add(ext_rocalution
 )
 
 add_dependencies(lsbench ext_rocalution)
-target_link_libraries(lsbench PRIVATE
-  ${ROCALUTION_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}rocalution${CMAKE_SHARED_LIBRARY_SUFFIX}
-  ${ROCALUTION_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}rocalution_hip${CMAKE_SHARED_LIBRARY_SUFFIX})
+target_link_libraries(lsbench PUBLIC
+  ${ROCALUTION_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}rocalution_hip${CMAKE_SHARED_LIBRARY_SUFFIX}
+  ${ROCALUTION_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}rocalution${CMAKE_SHARED_LIBRARY_SUFFIX})
+
 target_include_directories(lsbench PRIVATE ${ROCALUTION_INCDIR})
 
 

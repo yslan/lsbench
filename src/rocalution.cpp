@@ -4,8 +4,6 @@
 #if defined(LSBENCH_ROCALUTION)
 #include <cstdlib>
 #include <iostream>
-//#include "common.hpp"
-#include "rocalution/base/local_matrix.hpp"
 #include <rocalution/rocalution.hpp>
 
 using namespace rocalution;
@@ -65,7 +63,7 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   }
 
   // Set the CSR matrix data, csr_row_ptr, csr_col and csr_val pointers become invalid
-  roc_mat.SetDataPtrCSR(&csr_row_ptr, &csr_col_ind, &csr_val, "roc_mat", nnz, nr, nr);
+  roc_mat.SetDataPtrCSR(&csr_row_ptr, &csr_col_ind, &csr_val, "", (long) nnz, (long) nr, (long) nr);
 
   for (int i = 0; i < nr; i ++) {
     roc_rhs[i] = r[i];
@@ -135,7 +133,7 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
 
 int rocalution_finalize() { return 1; }
 
-#else // LSBENCH_HYPRE
+#else // LSBENCH_ROCALUTION
 int rocalution_init() { return 1; }
 int rocalution_finalize() { return 1; }
 int rocalution_bench(double *x, struct csr *A, const double *r,
