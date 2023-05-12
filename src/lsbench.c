@@ -72,8 +72,8 @@ static void print_help(int argc, char *argv[]) {
   printf("Usage: %s [OPTIONS]\n", "./driver");
   printf("Options:\n");
   printf("  --matrix <FILE>\n");
-  printf(
-      "  --solver <SOLVER>, Values: cusolver, hypre, amgx, cholmod, ginkgo\n");
+  printf("  --solver <SOLVER>, Values: rocalution, cusolver, hypre, amgx, "
+         "cholmod, ginkgo\n");
   printf("  --ordering <ORDERING>, Values: RCM, AMD, METIS\n");
   printf("  --precision <PRECISION>, Values: FP64, FP32, FP16\n");
   printf("  --verbose <VERBOSITY>, Values: 0, 1, 2, ...\n");
