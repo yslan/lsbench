@@ -35,6 +35,16 @@ void timer_log(const int id, const int mode) { // TODO add sync here
   _timer[id].ncalls++;
 }
 
+void timer_print_line(const int i) {
+
+  double tave = 0.0;
+  if (_timer[i].ncalls>0)  
+    tave = _timer[i].tsum / (double) _timer[i].ncalls;
+
+   printf("%9.2e %9.2e %9.2e   %3d %9.2e\n",
+              _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls,tave);
+}
+
 void timer_print(int verbose){
 /*
   0: elapsed
@@ -46,24 +56,15 @@ void timer_print(int verbose){
 */
   if (verbose==0) return;
 
-  if (verbose>1) {
+  int i;
+  printf("\n\nRuntime Statistics    (min / max / sum)        ncall  tave \n");
+  printf("  Lib Init.      ");timer_print_line(1);
+  printf("  Solver Setup   ");timer_print_line(2); 
+  printf("  Solver Solve   ");timer_print_line(4); 
+  printf("  HostToDevice   ");timer_print_line(3); 
+  printf("  DeviceToHost   ");timer_print_line(5); 
+  printf("\n\n");
 
-    int i;
-    printf("\n\nSummary (min/max/sum/ncall) \n");
-    i=1; printf("  Lib Init.      %9.2e %9.2e %9.2e  %3d\n", 
-                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
-    i=2; printf("  Solver Setup   %9.2e %9.2e %9.2e  %3d\n",
-                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
-    i=4; printf("  Solver Solve   %9.2e %9.2e %9.2e  %3d\n", 
-                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
-    i=3; printf("  HostToDevice   %9.2e %9.2e %9.2e  %3d\n",
-                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
-    i=5; printf("  DeviceToHost   %9.2e %9.2e %9.2e  %3d\n", 
-                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
-
-  } else {
-
-  }
 }
 
 

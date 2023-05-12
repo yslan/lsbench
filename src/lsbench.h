@@ -49,6 +49,7 @@ void lsbench_finalize(struct lsbench *cb);
 
 void timer_init();
 void timer_log(const int id, const int mode);
+void timer_print_line(const int i);
 void timer_print(int verbose);
 
 #ifdef __cplusplus
