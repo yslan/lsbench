@@ -47,13 +47,20 @@ void timer_print(int verbose){
   if (verbose==0) return;
 
   if (verbose>1) {
+
+    int i;
     printf("\n\nSummary (min/max/sum/ncall) \n");
-    printf("  Lib Init.      %9.2e %9.2e %9.2e  %3d\n", 
-           _timer[1].tmin,_timer[1].tmax,_timer[1].tsum,_timer[1].ncalls);
-    printf("  Solver Setup   %9.2e %9.2e %9.2e  %3d\n",
-           _timer[2].tmin,_timer[2].tmax,_timer[2].tsum,_timer[2].ncalls);
-    printf("  Solver Solve   %9.2e %9.2e %9.2e  %3d\n", 
-           _timer[5].tmin,_timer[5].tmax,_timer[5].tsum,_timer[5].ncalls);
+    i=1; printf("  Lib Init.      %9.2e %9.2e %9.2e  %3d\n", 
+                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
+    i=2; printf("  Solver Setup   %9.2e %9.2e %9.2e  %3d\n",
+                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
+    i=4; printf("  Solver Solve   %9.2e %9.2e %9.2e  %3d\n", 
+                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
+    i=3; printf("  HostToDevice   %9.2e %9.2e %9.2e  %3d\n",
+                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
+    i=5; printf("  DeviceToHost   %9.2e %9.2e %9.2e  %3d\n", 
+                _timer[i].tmin,_timer[i].tmax,_timer[i].tsum,_timer[i].ncalls);
+
   } else {
 
   }

@@ -63,10 +63,14 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   }
 
   // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3,0);
   roc_mat.MoveToAccelerator();
   roc_x.MoveToAccelerator();
   roc_r.MoveToAccelerator();
   roc_e.MoveToAccelerator();
+  _rocalution_sync();
+  timer_log(3,1);
 
   // Solver Setup
   timer_log(2,0);
@@ -108,12 +112,12 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   clock_t t;
   for (unsigned i = 0; i < cb->trials; i++) {
     _rocalution_sync();
-    timer_log(5,0);
+    timer_log(4,0);
 
     ls.Solve(roc_r, &roc_x);
 
     _rocalution_sync();
-    timer_log(5,1);
+    timer_log(4,1);
   }
 
 
@@ -128,7 +132,11 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   }
 
   // copy sol back
+  _rocalution_sync();
+  timer_log(5,0);
   roc_x.MoveToHost();
+  _rocalution_sync();
+  timer_log(5,1);
   for (int i = 0; i < nr; i ++) {
     x[i] = roc_x[i];
   }
