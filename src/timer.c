@@ -58,8 +58,8 @@ void timer_print(int verbose) {
 
   for (int i = 1; i < NTIMER; i++) {
     if (_timer[i].ncalls == 0) {
-      _timer[i].tmin = 1e10;
-      _timer[i].tmax = -1e10;
+      _timer[i].tmin = 0.0;
+      _timer[i].tmax = 0.0;
       _timer[i].tsum = 0.0;
     }
   }
