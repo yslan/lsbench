@@ -41,7 +41,6 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   roc_r.Allocate("roc_r", nr);
   roc_e.Allocate("roc_e", nr);
 
-  // Read matrix from MTX file
   // Allocate a CSR matrix
   int* csr_row_ptr   = new int[nr+1];
   int* csr_col_ind   = new int[nnz];
@@ -69,6 +68,8 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   roc_r.MoveToAccelerator();
   roc_e.MoveToAccelerator();
 
+  // Solver Setup
+  timer_log(2,0);
   // Linear Solver
   CG<LocalMatrix<double>, LocalVector<double>, double> ls;
 
@@ -77,26 +78,9 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
 
   // Set solver operator
   ls.SetOperator(roc_mat);
-  // Set solver preconditioner
   ls.SetPreconditioner(p);
-  // Build solver
   ls.Build();
-
-  // Verbosity output
-  if (cb->verbose>0) {
-    ls.Verbose(1);
-  } else {
-    ls.Verbose(0);
-  }
-
-/*
-  LU<LocalMatrix<double>, LocalVector<double>, double> dls;  
-  dls.Verbose(2);
-  dls.SetOperator(roc_mat);
-  dls.Build();
-  dls.Print();
-*/
-
+  timer_log(2,1);
 
   // Initial zero guess
   roc_x.Zeros();
@@ -108,36 +92,48 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
     roc_r.Info();
   }
 
-  // Start time measurement
-  double tick, tack;
-  tick = rocalution_time();
+  // Verbosity output
+  if (cb->verbose>1) {
+    ls.Verbose(1);
+    ls.Solve(roc_r, &roc_x);
+  }
 
-  // Solve A x = rhs
-  ls.Solve(roc_r, &roc_x);
-//  dls.Solve(roc_r, &roc_x);
+  // Warmup
+  ls.Verbose(0);
+  for (unsigned i = 0; i < cb->trials; i++)
+    ls.Solve(roc_r, &roc_x);
 
-  // Stop time measurement
-  tack = rocalution_time();
-  std::cout << "Solver execution:" << (tack - tick) / 1e6 << " sec" << std::endl;
+  // Time the solve
 
-  // Clear solver
-  ls.Clear();
-//  dls.Clear();
+  clock_t t;
+  for (unsigned i = 0; i < cb->trials; i++) {
+    _rocalution_sync();
+    timer_log(5,0);
 
-  // Compute error L2 norm
-  roc_e.Zeros();
-  roc_mat.Apply(roc_x, &roc_e);
-  roc_e.ScaleAdd(-1.0, roc_r);
+    ls.Solve(roc_r, &roc_x);
 
-  double error = roc_e.Norm();
-  std::cout << "norm(Ax-b) = " << error << std::endl;
+    _rocalution_sync();
+    timer_log(5,1);
+  }
 
+
+  if (cb->verbose>1) {
+    // Compute error L2 norm
+    roc_e.Zeros();
+    roc_mat.Apply(roc_x, &roc_e);
+    roc_e.ScaleAdd(-1.0, roc_r);
+
+    double error = roc_e.Norm();
+    std::cout << "rocalution norm(Ax-b) = " << error << std::endl;
+  }
+
+  // copy sol back
   roc_x.MoveToHost();
-  // copy back
   for (int i = 0; i < nr; i ++) {
     x[i] = roc_x[i];
   }
 
+  ls.Clear();
   roc_x.Clear();
   roc_e.Clear();
   roc_r.Clear();
@@ -147,7 +143,6 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
 int rocalution_finalize() { 
   if (!initialized)
     return 1;
-
 
   stop_rocalution();  
   initialized = 0;

@@ -47,6 +47,10 @@ const char *lsbench_get_matrix_name(struct lsbench *cb);
 void lsbench_bench(struct csr *A, const struct lsbench *cb);
 void lsbench_finalize(struct lsbench *cb);
 
+void timer_init();
+void timer_log(const int id, const int mode);
+void timer_print(int verbose);
+
 #ifdef __cplusplus
 }
 #endif

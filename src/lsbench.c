@@ -139,12 +139,16 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
   if (cb->precision != LSBENCH_PRECISION_FP64)
     errx(EXIT_FAILURE, "Precisions other than FP64 are not implemented yet.");
 
+  timer_init(cb->verbose);
+
+  timer_log(1,0);
   cusparse_init();
   hypre_init();
   amgx_init();
   cholmod_init();
   paralmond_init();
   rocalution_init();
+  timer_log(1,1);
 
   return cb;
 }
@@ -203,14 +207,14 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     csr_spmv(-1.0, A, x, 1.0, rd);
 
     if (cb->verbose > 1) {
-      printf("x   (min/max/amax)  %e %e %e\n", glmin(x, m), glmax(x, m),
+      printf("x   (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(x, m), glmax(x, m),
              glamax(x, m));
-      printf("rhs (min/max/amax)  %e %e %e\n", glmin(r, m), glmax(r, m),
+      printf("rhs (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(r, m), glmax(r, m),
              glamax(r, m));
-      printf("res (min/max/amax)  %e %e %e\n", glmin(rd, m), glmax(rd, m),
+      printf("res (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(rd, m), glmax(rd, m),
              glamax(rd, m));
     }
-    printf("norm(b-Ax) = %e    norm(b) = %e  norm(x) = %e\n", l2norm(rd, m),
+    printf("norm(b-Ax) = %14.4e    norm(b) = %14.4e  norm(x) = %14.4e\n", l2norm(rd, m),
            l2norm(r, m), l2norm(x, m));
 
     tfree(rd);
@@ -220,12 +224,16 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
 }
 
 void lsbench_finalize(struct lsbench *cb) {
+
   cusparse_finalize();
   hypre_finalize();
   amgx_finalize();
   cholmod_finalize();
   paralmond_finalize();
   rocalution_finalize();
+
+
+  timer_print(cb->verbose);
 
   if (cb)
     tfree(cb->matrix);
