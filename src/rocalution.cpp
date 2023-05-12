@@ -16,6 +16,7 @@ int rocalution_init() {
   // Initialize rocALUTION
   init_rocalution();
   initialized = 1;
+  return 0;
 }
 
 int rocalution_bench(double *x, struct csr *A, const double *r,
