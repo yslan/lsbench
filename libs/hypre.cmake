@@ -17,7 +17,8 @@ if (HYPRE_CUDA_ENABLED)
   endif()
   
   ExternalProject_Add(HYPRE_DEVICE_CUDA
-    URL https://github.com/yslan/hypre/archive/refs/tags/v2.27.1.tar.gz
+    GIT_REPOSITORY https://github.com/yslan/hypre
+    GIT_TAG hypre_nekrs
     SOURCE_DIR ${HYPRE_SOURCE_DIR}
     SOURCE_SUBDIR "src"
     BUILD_ALWAYS ON
@@ -60,7 +61,8 @@ elseif (HYPRE_HIP_ENABLED)
   find_package(hipSPARSE REQUIRED)
 
   ExternalProject_Add(HYPRE_DEVICE_HIP
-    URL https://github.com/yslan/hypre/archive/refs/tags/v2.27.1.tar.gz
+    GIT_REPOSITORY https://github.com/yslan/hypre
+    GIT_TAG hypre_nekrs
     SOURCE_DIR ${HYPRE_SOURCE_DIR}
     SOURCE_SUBDIR "src"
     BUILD_ALWAYS ON
@@ -92,7 +94,8 @@ elseif (HYPRE_DPCPP_ENABLED)
   message(FATAL_ERROR "HYPRE wrapper build does not support DPCPP!")
 else()
   ExternalProject_Add(HYPRE_CPU
-    URL https://github.com/yslan/hypre/archive/refs/tags/v2.27.1.tar.gz
+    GIT_REPOSITORY https://github.com/yslan/hypre
+    GIT_TAG hypre_nekrs
     SOURCE_DIR ${HYPRE_SOURCE_DIR}
     SOURCE_SUBDIR "src"
     BUILD_ALWAYS ON
