@@ -5,7 +5,7 @@ set(HYPRE_SOURCE_DIR ${CMAKE_BINARY_DIR}/3rd_party/hypre)
 set(HYPRE_LIBDIR ${HYPRE_INSTALL_DIR}/lib)
 set(HYPRE_INCDIR ${HYPRE_INSTALL_DIR}/include)
 
-if (HYPRE_CUDA_ENABLED)
+if (ENABLE_CUDA)
   set(HYPRE_CUDA_SM 70)
   set(HYPRE_ENABLE_DEVICE_MALLOC_ASYNC OFF)
   find_package(CUDAToolkit 11.0 REQUIRED)
@@ -51,7 +51,7 @@ if (HYPRE_CUDA_ENABLED)
     ${HYPRE_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}HYPRE${CMAKE_STATIC_LIBRARY_SUFFIX}
     CUDA::cudart CUDA::curand CUDA::cublas CUDA::cusparse CUDA::cusolver) 
   target_include_directories(lsbench PRIVATE ${HYPRE_INCDIR})
-elseif (HYPRE_HIP_ENABLED)
+elseif (ENABLE_HIP)
   find_package(HIP REQUIRED)
   find_package(rocrand REQUIRED)
   find_package(hipblas REQUIRED)
@@ -77,6 +77,8 @@ elseif (HYPRE_HIP_ENABLED)
       -DHYPRE_BUILD_TYPE=RelWithDebInfo
       -DCMAKE_C_COMPILER=/opt/rocm-5.3.0/bin/hipcc
       -DCMAKE_CXX_COMPILER=/opt/rocm-5.3.0/bin/hipcc
+      -DCMAKE_C_FLAGS_RELWITHDEBINFO=${CMAKE_C_FLAGS_RELWITHDEBINFO}
+      -DCMAKE_CXX_FLAGS_RELWITHDEBINFO=${CMAKE_CXX_FLAGS_RELWITHDEBINFO}
       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
       -DCMAKE_C_VISIBILITY_PRESET=hidden
       -DCMAKE_CXX_VISIBILITY_PRESET=hidden
@@ -90,7 +92,7 @@ elseif (HYPRE_HIP_ENABLED)
     hip::host roc::rocrand roc::hipblas roc::rocblas roc::rocsolver
     roc::rocsparse roc::hipsparse)
   target_include_directories(lsbench PRIVATE ${HYPRE_INCDIR})
-elseif (HYPRE_DPCPP_ENABLED)
+elseif (ENABLE_DPCPP)
   message(FATAL_ERROR "HYPRE wrapper build does not support DPCPP!")
 else()
   ExternalProject_Add(HYPRE_CPU

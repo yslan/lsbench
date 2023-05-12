@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.18)
 project(cusparse_cholesky VERSION 0.0.1 DESCRIPTION
   "Benchmark linear solve times" LANGUAGES C CXX)
 
+option(ENABLE_CUDA "Enable HYPRE CUDA support" OFF)
+option(ENABLE_HIP "Enable HYPRE HIP support" ON)
+option(ENABLE_DPCPP "Enable HYPRE SYCL support" OFF)
+
 option(ENABLE_CUSPARSE "Enable cusparse support." OFF)
 option(ENABLE_HYPRE "Enable Hypre support." OFF)
 option(ENABLE_AMGX "Enable AmgX support." OFF)
@@ -9,10 +13,6 @@ option(ENABLE_CHOLMOD "Enable Cholmod support." OFF)
 option(ENABLE_PARALMOND "Enable parAlmond support." OFF)
 option(ENABLE_ROCALUTION "Enable rocALUTION support." OFF)
 option(ENABLE_GINKGO "Enable Ginkgo support." ON)
-
-option(HYPRE_CUDA_ENABLED "Enable HYPRE CUDA support" OFF)
-option(HYPRE_HIP_ENABLED "Enable HYPRE HIP support" ON)
-option(HYPRE_DPCPP_ENABLED "Enable HYPRE SYCL support" OFF)
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
@@ -34,6 +34,16 @@ set_target_properties(lsbench PROPERTIES
   VERSION ${PROJECT_VERSION}
   SOVERSION 1
   PUBLIC_HEADER src/lsbench.h)
+
+if (ENABLE_CUDA)
+  target_compile_definitions(lsbench PRIVATE -DENABLE_CUDA)
+endif()
+if (ENABLE_HIP)
+  target_compile_definitions(lsbench PRIVATE -DENABLE_HIP)
+endif()
+if (ENABLE_DPCPP)
+  target_compile_definitions(lsbench PRIVATE -DENABLE_DPCPP)
+endif()
 
 if (ENABLE_CUSPARSE)
   include(libs/cusparse.cmake)
