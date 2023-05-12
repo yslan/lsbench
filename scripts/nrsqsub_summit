@@ -1,0 +1,111 @@
+#!/bin/bash
+
+: ${PROJ_ID:="CSC262"}
+: ${CPUONLY:=0}
+
+if [ $# -ne 4 ]; then
+  echo "usage: [PROJ_ID=value] [CPUONLY=value] $0 <matrix> <solver> <number of compute nodes> <hh:mm:ss>"
+  exit 0
+fi
+
+if [ -z "$PROJ_ID" ]; then
+  echo "ERROR: PROJ_ID is empty"
+  exit 1
+fi
+
+case=$1
+solver=$2
+nodes=$3
+time=$4
+
+bin=./install_dir/bin/driver
+gpu_per_node=1
+core_per_node=1
+let nn=$nodes*$gpu_per_node
+let ntasks=nn
+
+if [ $CPUONLY -eq 1 ]; then
+  let nn=$nodes*$core_per_node
+  let ntasks=nn
+fi
+
+if [ ! -f $bin ]; then
+  echo "Cannot find" $bin
+  exit 1
+fi
+
+if [ ! -f $case ]; then
+  echo "Cannot find" $case
+  exit 1
+fi
+
+export ROMIO_HINTS="$(pwd)/.romio_hint"
+if [ ! -f "$ROMIO_HINTS" ]; then
+  echo "romio_no_indep_rw true"   >$ROMIO_HINTS
+  echo "romio_cb_write enable"   >>$ROMIO_HINTS
+  echo "romio_ds_write enable"   >>$ROMIO_HINTS
+  echo "romio_cb_read enable"    >>$ROMIO_HINTS
+  echo "romio_ds_read enable"    >>$ROMIO_HINTS
+  echo "cb_buffer_size 16777216" >>$ROMIO_HINTS
+  echo "cb_config_list *:1"      >>$ROMIO_HINTS
+fi
+
+# sbatch
+SFILE=s.bin
+echo "#!/bin/bash" > $SFILE
+echo "#BSUB -P $PROJ_ID" >>$SFILE
+echo "#BSUB -J lsbench" >>$SFILE
+echo "#BSUB -alloc_flags NVME" >>$SFILE
+echo "#BSUB -W $time" >>$SFILE
+echo "#BSUB -nnodes $nodes" >>$SFILE
+
+echo "" >> $SFILE
+
+echo "module load gcc" >> $SFILE
+echo "module unload darshan-runtime" >> $SFILE
+
+echo "" >> $SFILE
+echo "# work-around for barrier issue" >> $SFILE
+echo "export OMPI_MCA_coll_ibm_collselect_mode_barrier=failsafe" >> $SFILE
+
+echo "# optimize for BW" >> $SFILE
+echo "export PAMI_ENABLE_STRIPING=1" >> $SFILE
+echo "export PAMI_IBV_ADAPTER_AFFINITY=1" >> $SFILE
+echo "export PAMI_IBV_DEVICE_NAME=\"mlx5_0:1,mlx5_3:1\"" >> $SFILE
+echo "export PAMI_IBV_DEVICE_NAME_1=\"mlx5_3:1,mlx5_0:1\"" >> $SFILE
+echo "export OMPI_MCA_io=romio321" >> $SFILE
+echo "export ROMIO_HINTS=\"$(pwd)/.romio_hint\"" >> $SFILE
+
+echo "" >> $SFILE
+
+# repeat computation in user s.bin file for better readability
+echo "bin=$bin" >> $SFILE
+echo "case=$case" >> $SFILE
+echo "nodes=$nodes" >> $SFILE
+echo "CPUONLY=$CPUONLY" >> $SFILE
+echo "gpu_per_node=${gpu_per_node}" >> $SFILE
+echo "core_per_node=${core_per_node}" >> $SFILE
+echo "let nn=\$nodes*\$gpu_per_node" >> $SFILE
+echo "let ntasks=nn" >> $SFILE
+
+echo "" >> $SFILE
+
+echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
+echo "  let nn=\$nodes" >> $SFILE
+echo "  let ntasks=\$nn*\$core_per_node" >> $SFILE
+echo "fi " >> $SFILE
+
+echo "" >> $SFILE
+echo "date" >>$SFILE
+echo "" >> $SFILE
+
+echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
+echo "  jsrun -X 1 -n\$nn -a\$core_per_node -c\$core_per_node -g1 -b packed:1 -d packed \$bin --solver ${solver} --matrix \$case" >> $SFILE
+echo "else" >> $SFILE
+echo "  jsrun -X 1 -n\$nn -r\$gpu_per_node -a1 -c2 -g1 -b rs -d packed \$bin --solver ${solver} --matrix \$case" >> $SFILE
+echo "fi" >> $SFILE
+
+bsub $SFILE
+
+# clean-up
+# rm -rf $SFILE $ROMIO_HINTS
