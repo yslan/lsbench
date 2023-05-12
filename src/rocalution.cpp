@@ -1,5 +1,4 @@
 #include "lsbench-impl.h"
-//#include <math.h>
 
 #if defined(LSBENCH_ROCALUTION)
 #include <cstdlib>
