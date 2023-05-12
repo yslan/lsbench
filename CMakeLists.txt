@@ -11,7 +11,7 @@ option(ENABLE_HYPRE "Enable Hypre support." OFF)
 option(ENABLE_AMGX "Enable AmgX support." OFF)
 option(ENABLE_CHOLMOD "Enable Cholmod support." OFF)
 option(ENABLE_PARALMOND "Enable parAlmond support." OFF)
-option(ENABLE_ROCALUTION "Enable rocALUTION support." OFF)
+option(ENABLE_ROCALUTION "Enable rocALUTION support." ON)
 option(ENABLE_GINKGO "Enable Ginkgo support." ON)
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
