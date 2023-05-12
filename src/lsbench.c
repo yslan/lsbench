@@ -28,6 +28,8 @@ static lsbench_solver_t str_to_solver(const char *str) {
     return LSBENCH_SOLVER_PARALMOND;
   } else if (strcmp(up, "ROCALUTION") == 0) {
     return LSBENCH_SOLVER_ROCALUTION;
+  } else if (strcmp(up, "GINKGO") == 0) {
+    return LSBENCH_SOLVER_GINKGO;
   } else {
     warnx("Invalid solver: \"%s\". Defaulting to CHOLMOD.", str);
     return LSBENCH_SOLVER_CHOLMOD;
@@ -70,7 +72,8 @@ static void print_help(int argc, char *argv[]) {
   printf("Usage: %s [OPTIONS]\n", "./driver");
   printf("Options:\n");
   printf("  --matrix <FILE>\n");
-  printf("  --solver <SOLVER>, Values: cusolver, hypre, amgx, cholmod\n");
+  printf(
+      "  --solver <SOLVER>, Values: cusolver, hypre, amgx, cholmod, ginkgo\n");
   printf("  --ordering <ORDERING>, Values: RCM, AMD, METIS\n");
   printf("  --precision <PRECISION>, Values: FP64, FP32, FP16\n");
   printf("  --verbose <VERBOSITY>, Values: 0, 1, 2, ...\n");
@@ -198,6 +201,9 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     break;
   case LSBENCH_SOLVER_ROCALUTION:
     rocalution_bench(x, A, r, cb);
+    break;
+  case LSBENCH_SOLVER_GINKGO:
+    ginkgo_bench(x, A, r, cb);
     break;
   default:
     errx(EXIT_FAILURE, "Unknown solver: %d.", cb->solver);
