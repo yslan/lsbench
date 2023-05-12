@@ -15,7 +15,7 @@ void print_vector(const std::string &name,
 
 static std::shared_ptr<gko::matrix::Csr<double, int>>
 csr_init(struct csr *A, const struct lsbench *cb) {
-  auto exec = gko::CudaExecutor::create(0, gko::OmpExecutor::create());
+  auto exec = gko::HipExecutor::create(0, gko::OmpExecutor::create());
 
   unsigned m = A->nrows;
   unsigned nnz = A->offs[m];
