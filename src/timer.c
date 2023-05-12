@@ -56,8 +56,17 @@ void timer_print(int verbose) {
   if (verbose == 0)
     return;
 
+  for (int i = 1; i < NTIMER; i++) {
+    if (_timer[i].ncalls == 0) {
+      _timer[i].tmin = 1e10;
+      _timer[i].tmax = -1e10;
+      _timer[i].tsum = 0.0;
+    }
+  }
+
+
   int i;
-  printf("\n\nRuntime Statistics    (min / max / sum)        ncall  tave \n");
+  printf("Runtime Statistics    (min / max / sum)        ncall  tave \n");
   printf("  Lib Init.      ");
   timer_print_line(1);
   printf("  Solver Setup   ");

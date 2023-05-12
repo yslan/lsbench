@@ -24,13 +24,17 @@ static void csr_finalize(struct hypre_csr *A) {
   tfree(A);
 }
 
-int hypre_init() {
+int hypre_init(struct lsbench *cb) {
   if (initialized)
     return 1;
 
   HYPRE_Init();
   HYPRE_SetMemoryLocation(HYPRE_MEMORY_DEVICE);
   HYPRE_SetExecutionPolicy(HYPRE_EXEC_DEVICE);
+
+  if (cb->verbose>0) {
+    printf("precision: %d bit \n",sizeof(HYPRE_Real));
+  }
 
   // Settings for cuda
   HYPRE_Int spgemm_use_vendor = 0;
@@ -203,9 +207,7 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
   HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
   HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
 
-  if (cb->verbose == 1) {
-    HYPRE_BoomerAMGSetPrintLevel(solver, 1);
-  } else if (cb->verbose > 1) {
+  if (cb->verbose > 1) {
     HYPRE_BoomerAMGSetPrintLevel(solver, 3);
   }
   HYPRE_BoomerAMGSetup(solver, par_A, par_b, par_x);
@@ -236,7 +238,6 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   // HYPRE_IJVectorPrint(B->x, "x.dat");
 
   // Warmup
-
   if (cb->verbose > 1) {
     HYPRE_BoomerAMGSetPrintLevel(solver, 2);
     HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);

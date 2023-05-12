@@ -143,16 +143,6 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
     errx(EXIT_FAILURE, "Precisions other than FP64 are not implemented yet.");
 
   timer_init(cb->verbose);
-
-  timer_log(1, 0);
-  cusparse_init();
-  hypre_init();
-  amgx_init();
-  cholmod_init();
-  paralmond_init();
-  rocalution_init();
-  timer_log(1, 1);
-
   return cb;
 }
 
@@ -185,24 +175,50 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
 
   switch (cb->solver) {
   case LSBENCH_SOLVER_CUSOLVER:
+    timer_log(1, 0);
+    cusparse_init();
+    timer_log(1, 1);
     cusparse_bench(x, A, r, cb);
+    cusparse_finalize();
     break;
   case LSBENCH_SOLVER_HYPRE:
+    timer_log(1, 0);
+    hypre_init(cb);
+    timer_log(1, 1);
     hypre_bench(x, A, r, cb);
+    hypre_finalize();
     break;
   case LSBENCH_SOLVER_AMGX:
+    timer_log(1, 0);
+    amgx_init();
+    timer_log(1, 1);
     amgx_bench(x, A, r, cb);
+    amgx_finalize();
     break;
   case LSBENCH_SOLVER_CHOLMOD:
+    timer_log(1, 0);
+    cholmod_init();
+    timer_log(1, 1);
     cholmod_bench(x, A, r, cb);
+    cholmod_finalize();
     break;
   case LSBENCH_SOLVER_PARALMOND:
+    timer_log(1, 0);
+    paralmond_init();
+    timer_log(1, 1);
     paralmond_bench(x, A, r, cb);
+    paralmond_finalize();
     break;
   case LSBENCH_SOLVER_ROCALUTION:
+    timer_log(1, 0);
+    rocalution_init();
+    timer_log(1, 1);
     rocalution_bench(x, A, r, cb);
+    rocalution_finalize();
     break;
   case LSBENCH_SOLVER_GINKGO:
+    timer_log(1, 0);
+    timer_log(1, 1);
     ginkgo_bench(x, A, r, cb);
     break;
   default:
@@ -236,13 +252,6 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
 }
 
 void lsbench_finalize(struct lsbench *cb) {
-
-  cusparse_finalize();
-  hypre_finalize();
-  amgx_finalize();
-  cholmod_finalize();
-  paralmond_finalize();
-  rocalution_finalize();
 
   timer_print(cb->verbose);
 
