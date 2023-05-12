@@ -13,6 +13,7 @@ typedef enum {
   LSBENCH_SOLVER_CHOLMOD = 3,
   LSBENCH_SOLVER_PARALMOND = 4,
   LSBENCH_SOLVER_ROCALUTION = 5
+  LSBENCH_SOLVER_GINKGO = 5
 } lsbench_solver_t;
 
 typedef enum {

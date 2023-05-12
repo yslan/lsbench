@@ -3,11 +3,12 @@ project(cusparse_cholesky VERSION 0.0.1 DESCRIPTION
   "Benchmark linear solve times" LANGUAGES C CXX)
 
 option(ENABLE_CUSPARSE "Enable cusparse support." OFF)
-option(ENABLE_HYPRE "Enable Hypre support." ON)
+option(ENABLE_HYPRE "Enable Hypre support." OFF)
 option(ENABLE_AMGX "Enable AmgX support." OFF)
 option(ENABLE_CHOLMOD "Enable Cholmod support." OFF)
 option(ENABLE_PARALMOND "Enable parAlmond support." OFF)
 option(ENABLE_ROCALUTION "Enable rocALUTION support." OFF)
+option(ENABLE_GINKGO "Enable Ginkgo support." ON)
 
 option(HYPRE_CUDA_ENABLED "Enable HYPRE CUDA support" OFF)
 option(HYPRE_HIP_ENABLED "Enable HYPRE HIP support" ON)
@@ -25,7 +26,7 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(SOURCES src/lsbench.c src/lsbench-csr.c src/timer.c
   src/cusparse.c src/hypre.c src/amgx.c src/cholmod.c 
-  src/paralmond.cpp src/rocalution.cpp)
+  src/paralmond.cpp src/rocalution.cpp src/ginkgo.cpp)
 
 add_library(lsbench SHARED ${SOURCES})
 target_include_directories(lsbench PRIVATE src)
@@ -57,6 +58,10 @@ endif()
 if (ENABLE_ROCALUTION)
   include(libs/rocalution.cmake)
   target_compile_definitions(lsbench PRIVATE -DLSBENCH_ROCALUTION)
+endif()
+if (ENABLE_GINKGO)
+  include(libs/ginkgo.cmake)
+  target_compile_definitions(lsbench PRIVATE -DLSBENCH_GINKGO)
 endif()
 
 add_executable(driver bin/driver.c)
