@@ -7,7 +7,7 @@ option(ENABLE_HIP "Enable HYPRE HIP support" ON)
 option(ENABLE_DPCPP "Enable HYPRE SYCL support" OFF)
 
 option(ENABLE_CUSPARSE "Enable cusparse support." OFF)
-option(ENABLE_HYPRE "Enable Hypre support." OFF)
+option(ENABLE_HYPRE "Enable Hypre support." ON)
 option(ENABLE_AMGX "Enable AmgX support." OFF)
 option(ENABLE_CHOLMOD "Enable Cholmod support." OFF)
 option(ENABLE_PARALMOND "Enable parAlmond support." OFF)
