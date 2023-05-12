@@ -141,14 +141,14 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
 
   timer_init(cb->verbose);
 
-  timer_log(1,0);
+  timer_log(1, 0);
   cusparse_init();
   hypre_init();
   amgx_init();
   cholmod_init();
   paralmond_init();
   rocalution_init();
-  timer_log(1,1);
+  timer_log(1, 1);
 
   return cb;
 }
@@ -162,24 +162,23 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
   double *r = tcalloc(double, m);
   double *x = tcalloc(double, m);
 
-  if (cb->verbose>1) {
-    printf("matrix size nr = %d   nnz = %d \n",m,A->offs[m]);
+  if (cb->verbose > 1) {
+    printf("matrix size nr = %d   nnz = %d \n", m, A->offs[m]);
   }
 
-
   // initialize rhs, TODO: maybe make ||x||=1?
-  int seed = 27; // seed of the random  
+  int seed = 27; // seed of the random
   srand(seed);
   for (unsigned i = 0; i < m; i++)
-    r[i] = (double) rand() / RAND_MAX;
+    r[i] = (double)rand() / RAND_MAX;
   double tmp = l2norm(r, m);
   for (unsigned i = 0; i < m; i++)
     r[i] = r[i] / tmp;
-  if (cb->verbose>1) {
-    tmp = l2norm(r,m);
-    printf("rhs initialized by rand() with seed = %d and RAND_MAX = %d\n",seed,RAND_MAX,tmp);
+  if (cb->verbose > 1) {
+    tmp = l2norm(r, m);
+    printf("rhs initialized by rand() with seed = %d and RAND_MAX = %d\n", seed,
+           RAND_MAX, tmp);
   }
-
 
   switch (cb->solver) {
   case LSBENCH_SOLVER_CUSOLVER:
@@ -212,15 +211,15 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     csr_spmv(-1.0, A, x, 1.0, rd);
 
     if (cb->verbose > 1) {
-      printf("x   (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(x, m), glmax(x, m),
-             glamax(x, m));
-      printf("rhs (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(r, m), glmax(r, m),
-             glamax(r, m));
-      printf("res (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(rd, m), glmax(rd, m),
-             glamax(rd, m));
+      printf("x   (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(x, m),
+             glmax(x, m), glamax(x, m));
+      printf("rhs (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(r, m),
+             glmax(r, m), glamax(r, m));
+      printf("res (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(rd, m),
+             glmax(rd, m), glamax(rd, m));
     }
-    printf("norm(b-Ax) = %14.4e    norm(b) = %14.4e  norm(x) = %14.4e\n", l2norm(rd, m),
-           l2norm(r, m), l2norm(x, m));
+    printf("norm(b-Ax) = %14.4e    norm(b) = %14.4e  norm(x) = %14.4e\n",
+           l2norm(rd, m), l2norm(r, m), l2norm(x, m));
 
     tfree(rd);
   }
@@ -236,7 +235,6 @@ void lsbench_finalize(struct lsbench *cb) {
   cholmod_finalize();
   paralmond_finalize();
   rocalution_finalize();
-
 
   timer_print(cb->verbose);
 

@@ -67,7 +67,7 @@ int paralmond_bench(double *x, struct csr *A, const double *r,
 int rocalution_init();
 int rocalution_finalize();
 int rocalution_bench(double *x, struct csr *A, const double *r,
-                    const struct lsbench *cb);
+                     const struct lsbench *cb);
 
 #ifdef __cplusplus
 }
