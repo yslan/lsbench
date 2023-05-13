@@ -61,11 +61,11 @@ static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
     roc_e.ScaleAdd(-1.0, roc_r);
 
     T error = roc_e.Norm();
-    std::cout << "rocalution norm(Ax-b) = " << error << std::endl;
+    printf("rocalution norm(b-Ax) = %14.4e \n",error);
+    fflush(stdout); 
+      
+    roc_e.Clear();
   }
-
-  // Initial zero guess
-  roc_x.Zeros();
 
   // Warmup
   ls.Verbose(0);
@@ -207,11 +207,11 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
     roc_e.ScaleAdd(-1.0, roc_r);
 
     T error = roc_e.Norm();
-    std::cout << "rocalution norm(Ax-b) = " << error << std::endl;
-  }
+    printf("rocalution norm(b-Ax) = %14.4e \n",error);
+    fflush(stdout); 
 
-  // Initial zero guess
-  roc_x.Zeros();
+    roc_e.Clear();
+  }
 
   // Warmup
   ls.Verbose(0);
