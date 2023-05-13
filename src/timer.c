@@ -1,47 +1,50 @@
 #include "lsbench-impl.h"
+#include <float.h>
+#include <math.h>
+
 #define NTIMER 10
 
 struct my_timer {
   double tmin, tmax, tsum;
+  clock_t tic;
   int ncalls;
 };
 
-static struct my_timer _timer[NTIMER];
-static clock_t _tic[NTIMER];
+static struct my_timer timer[NTIMER];
 
 void timer_init() {
   for (int i = 1; i < NTIMER; i++) {
-    _timer[i].tmin = 1e10;
-    _timer[i].tmax = -1e10;
-    _timer[i].tsum = 0.0;
-    _timer[i].ncalls = 0;
+    timer[i].tmin = DBL_MAX;
+    timer[i].tmax = -DBL_MIN;
+    timer[i].tsum = 0.0;
+    timer[i].ncalls = 0;
   }
 }
 
-void timer_log(const int id, const int mode) { // TODO add sync here
+// TODO: add sync in this routine.
+void timer_log(const int id, const int mode) {
   // tic
   if (mode == 0) {
-    _tic[id] = clock();
+    timer[id].tic = clock();
     return;
   }
 
   // toc
-  clock_t t = clock() - _tic[id];
+  clock_t t = clock() - timer[id].tic;
   double tsec = (double)t / CLOCKS_PER_SEC;
-  _timer[id].tmin = fmin(_timer[id].tmin, tsec);
-  _timer[id].tmax = fmax(_timer[id].tmax, tsec);
-  _timer[id].tsum += tsec;
-  _timer[id].ncalls++;
+  timer[id].tmin = fmin(timer[id].tmin, tsec);
+  timer[id].tmax = fmax(timer[id].tmax, tsec);
+  timer[id].tsum += tsec;
+  timer[id].ncalls++;
 }
 
 void timer_print_line(const int i) {
-
   double tave = 0.0;
-  if (_timer[i].ncalls > 0)
-    tave = _timer[i].tsum / (double)_timer[i].ncalls;
+  if (timer[i].ncalls > 0)
+    tave = timer[i].tsum / (double)timer[i].ncalls;
 
-  printf("%9.2e %9.2e %9.2e   %3d %9.2e\n", _timer[i].tmin, _timer[i].tmax,
-         _timer[i].tsum, _timer[i].ncalls, tave);
+  printf("%9.2e %9.2e %9.2e   %3d %9.2e\n", timer[i].tmin, timer[i].tmax,
+         timer[i].tsum, timer[i].ncalls, tave);
 }
 
 void timer_print(int verbose) {
@@ -57,14 +60,13 @@ void timer_print(int verbose) {
     return;
 
   for (int i = 1; i < NTIMER; i++) {
-    if (_timer[i].ncalls == 0) {
-      _timer[i].tmin = 0.0;
-      _timer[i].tmax = 0.0;
-      _timer[i].tsum = 0.0;
+    if (timer[i].ncalls == 0) {
+      timer[i].tmin = 0.0;
+      timer[i].tmax = 0.0;
+      timer[i].tsum = 0.0;
     }
   }
 
-  int i;
   printf("Runtime Statistics    (min / max / sum)        ncall  tave \n");
   printf("  Lib Init.      ");
   timer_print_line(1);
@@ -78,3 +80,5 @@ void timer_print(int verbose) {
   timer_print_line(5);
   printf("\n\n");
 }
+
+#undef NTIMER

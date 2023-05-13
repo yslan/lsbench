@@ -141,7 +141,7 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
   if (cb->matrix == NULL)
     errx(EXIT_FAILURE, "Input matrix file not provided. Try `--help`.");
 
-  timer_init(cb->verbose);
+  timer_init();
 
   return cb;
 }
