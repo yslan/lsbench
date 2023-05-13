@@ -120,6 +120,32 @@ HYPRE_Solver hypre_bench_AMG_setup(struct hypre_csr* B) {
   return solver;
 }
 
+HYPRE_Solver hypre_bench_PCG_setup(struct hypre_csr* B, HYPRE_Solver precond) {
+
+  int comm = 0;
+  HYPRE_Solver solver=0;
+  HYPRE_ParCSRPCGCreate(comm, &solver);
+
+  HYPRE_ParCSRPCGSetMaxIter(solver, 1000); 
+  HYPRE_ParCSRPCGSetTol(solver, 1e-6); 
+  HYPRE_ParCSRPCGSetAbsoluteTol(solver, 1e-8); 
+  HYPRE_ParCSRPCGSetTwoNorm(solver, 1); 
+  HYPRE_ParCSRPCGSetLogging(solver, 1); // This is needed to extract final residual
+
+  HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSolve,
+                      (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSetup, precond);
+
+  HYPRE_ParVector par_b, par_x;
+  HYPRE_ParCSRMatrix par_A;
+  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
+  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
+  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
+
+  HYPRE_ParCSRPCGSetup(solver, par_A, par_b, par_x);
+
+  return solver;
+}
+
 // hypre_bench for backends
 #if defined(ENABLE_CUDA) // CUDA
 #include <cuda_runtime.h>
@@ -204,24 +230,19 @@ void cpu_hypre_bench_run(char* str_solver, HYPRE_Solver solver,
   HYPRE_Real *d_x = tcalloc(HYPRE_Real, nr);;
   HYPRE_Real *d_r = tcalloc(HYPRE_Real, nr);
   for (unsigned i = 0; i < nr; i++) {
+    x[i] = 0.0;
     d_r[i] = (HYPRE_Real) r[i];
     d_x[i] = (HYPRE_Real) 0.0;
   }
 
   HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
   HYPRE_IJVectorUpdateValues(B->b, nr, NULL, d_r, 1);
-/*
-  HYPRE_ParVector par_x, par_b;
-  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
-  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
 
-  HYPRE_ParCSRMatrix par_A;
-  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
-*/
   if (cb->verbose > 1) {
 //    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
 //    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
     PtrToFcn_PrintLevel(solver, 3);
+    HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
     PtrToFcn_Solve(solver, par_A, par_b, par_x);
 
 
@@ -261,7 +282,7 @@ void cpu_hypre_bench_run(char* str_solver, HYPRE_Solver solver,
   for (unsigned i = 0; i < cb->trials; i++) {
     HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
     timer_log(4, 0);
-    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    PtrToFcn_Solve(solver, par_A, par_b, par_x);
     timer_log(4, 1);
   }
 
@@ -323,43 +344,37 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   }
 
   struct hypre_csr *B = csr_init(A, cb);
+  HYPRE_Solver solver=0, precond=0;
 
   // Benchmark AMG.
   timer_log(2,0);
-  HYPRE_Solver solver = hypre_bench_AMG_setup(B);
+  solver = hypre_bench_AMG_setup(B);
   timer_log(2,1);
   hypre_bench_run("HYPRE AMG", solver, 
-                  HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetPrintLevel,
-                  B, x, A, r, cb);
+                  HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetPrintLevel, B, x, A, r, cb);
   HYPRE_BoomerAMGDestroy(solver);
 
-/*
   // Benchmark PCG + AMG
   timer_log(2,0);
-
-  HYPRE_Solver precond = hypre_bench_AMG_setup(B);
-
-  int comm = 0;
-  HYPRE_ParCSRPCGCreate(comm, &solver);
-
-  HYPRE_PCGSetMaxIter(solver, 1000); 
-  HYPRE_PCGSetTol(solver, 1e-6); 
-  HYPRE_PCGSetTwoNorm(solver, 1); 
-//  HYPRE_PCGSetLogging(solver, 1);
-
-  HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSolve,
-                      (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSetup, precond);
-
-  HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
-
-  HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
-HYPRE_Int HYPRE_ParCSRPCGSolve(HYPRE_Solver solver, HYPRE_ParCSRMatrix A, HYPRE_ParVector b, HYPRE_ParVector x)
-
+  precond = hypre_bench_AMG_setup(B);
+  solver = hypre_bench_PCG_setup(B, precond);
   timer_log(2,1);
-  hypre_bench_run("HYPRE PCG+AMG", solver, B, x, A, r, cb);
-  HYPRE_BoomerAMGDestroy(solver);
-*/
+  hypre_bench_run("HYPRE PCG+AMG", solver, 
+                  HYPRE_ParCSRPCGSolve, HYPRE_ParCSRPCGSetPrintLevel, B, x, A, r, cb);
 
+  if (cb->verbose>1) { // Run info - needed logging turned on
+    int num_iterations=0;
+    HYPRE_Real final_res_norm=0;
+
+    HYPRE_PCGGetNumIterations(solver, &num_iterations);
+    HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);
+    printf("Iterations = %d\n", num_iterations);
+    printf("Final Relative Residual Norm = %e\n", final_res_norm);
+    fflush(stdout);
+  }
+
+  HYPRE_ParCSRPCGDestroy(solver);
+  HYPRE_BoomerAMGDestroy(precond);
 
   csr_finalize(B);
 
