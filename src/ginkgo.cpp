@@ -13,10 +13,10 @@ csr_init(struct csr *A, const struct lsbench *cb) {
       exec->get_master(), gko::dim<2>{m, m}, nnz);
   // unsigned -> int since ginkgo also likes ints.
   for (unsigned i = 0; i < m + 1; i++)
-    ginkgo_csr_host->get_row_ptrs()[i] = A->offs[i] + A->base;
+    ginkgo_csr_host->get_row_ptrs()[i] = A->offs[i];
 
   for (unsigned i = 0; i < nnz; i++)
-    ginkgo_csr_host->get_col_idxs()[i] = A->cols[i];
+    ginkgo_csr_host->get_col_idxs()[i] = A->cols[i] - A->base;
 
   for (unsigned i = 0; i < nnz; i++)
     ginkgo_csr_host->get_values()[i] = A->vals[i];
