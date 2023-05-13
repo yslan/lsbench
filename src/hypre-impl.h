@@ -106,12 +106,14 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
 }
 
 #define hypre_bench_run TOKEN_PASTE(GPU, _hypre_bench_run)
-void hypre_bench_run(char* str_solver, HYPRE_Solver solver, 
-                     HYPRE_Int (*PtrToFcn_Solve)(HYPRE_Solver, HYPRE_ParCSRMatrix, HYPRE_ParVector, HYPRE_ParVector),
+void hypre_bench_run(char *str_solver, HYPRE_Solver solver,
+                     HYPRE_Int (*PtrToFcn_Solve)(HYPRE_Solver,
+                                                 HYPRE_ParCSRMatrix,
+                                                 HYPRE_ParVector,
+                                                 HYPRE_ParVector),
                      HYPRE_Int (*PtrToFcn_PrintLevel)(HYPRE_Solver, HYPRE_Int),
-                     struct hypre_csr* B,
-                     double *x, struct csr *A, const double *r,
-                     const struct lsbench *cb){
+                     struct hypre_csr *B, double *x, struct csr *A,
+                     const double *r, const struct lsbench *cb) {
 
   HYPRE_ParVector par_b, par_x;
   HYPRE_ParCSRMatrix par_A;
@@ -126,14 +128,14 @@ void hypre_bench_run(char* str_solver, HYPRE_Solver solver,
 
   HYPRE_Real *tmp = tcalloc(HYPRE_Real, nr);
   for (unsigned i = 0; i < nr; i++) {
-    tmp[i] = (HYPRE_Real) r[i];
+    tmp[i] = (HYPRE_Real)r[i];
     x[i] = 0.0;
   }
 
   chk_rt(gpuDeviceSynchronize());
   timer_log(3, 0);
   chk_rt(gpuMemcpy(d_r, tmp, nr * sizeof(HYPRE_Real), gpuMemcpyHostToDevice));
-  chk_rt(gpuMemcpy(d_x, x,   nr * sizeof(HYPRE_Real), gpuMemcpyHostToDevice));
+  chk_rt(gpuMemcpy(d_x, x, nr * sizeof(HYPRE_Real), gpuMemcpyHostToDevice));
   chk_rt(gpuDeviceSynchronize());
   timer_log(3, 1);
 
@@ -143,40 +145,41 @@ void hypre_bench_run(char* str_solver, HYPRE_Solver solver,
   // HYPRE_IJVectorPrint(B->x, "x.dat");
 
   if (cb->verbose > 1) {
-//    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
-//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    //    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+    //    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
     PtrToFcn_PrintLevel(solver, 3);
     PtrToFcn_Solve(solver, par_A, par_b, par_x);
 
     int comm = 0;
     HYPRE_BigInt lower = A->base, upper = (HYPRE_BigInt)A->nrows - 1 + A->base;
-    
+
     HYPRE_IJVector rd;
     HYPRE_IJVectorCreate(comm, lower, upper, &rd);
     HYPRE_IJVectorSetObjectType(rd, HYPRE_PARCSR);
     HYPRE_IJVectorInitialize(rd);
     HYPRE_IJVectorAssemble(rd);
-    
+
     HYPRE_ParVector par_e;
     HYPRE_IJVectorGetObject(rd, (void **)&par_e);
     HYPRE_IJVectorUpdateValues(rd, nr, NULL, d_r, 1);
-    
+
     HYPRE_Real norm;
     HYPRE_ParCSRMatrixMatvec(-1.0, par_A, par_x, 1.0, par_e);
     HYPRE_ParVectorInnerProd(par_e, par_e, &norm);
-    if (norm>0) norm = sqrt(norm);
+    if (norm > 0)
+      norm = sqrt(norm);
     printf("%s norm(b-Ax) = %14.4e\n", str_solver, norm);
     fflush(stdout);
-  
+
     HYPRE_IJVectorDestroy(rd);
   }
 
   // Warmup
-//  HYPRE_BoomerAMGSetPrintLevel(solver, 0);
+  //  HYPRE_BoomerAMGSetPrintLevel(solver, 0);
   PtrToFcn_PrintLevel(solver, 0);
   for (unsigned i = 0; i < cb->trials; i++) {
     HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
-//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    //    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
     PtrToFcn_Solve(solver, par_A, par_b, par_x);
   }
 
@@ -187,7 +190,7 @@ void hypre_bench_run(char* str_solver, HYPRE_Solver solver,
 
     chk_rt(gpuDeviceSynchronize());
     timer_log(4, 0);
-//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    //    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
     PtrToFcn_Solve(solver, par_A, par_b, par_x);
     chk_rt(gpuDeviceSynchronize());
     timer_log(4, 1);

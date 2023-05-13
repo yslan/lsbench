@@ -11,7 +11,7 @@ struct my_timer {
 };
 
 static struct my_timer timer[NTIMER];
-static char* tags[NTIMER/5];
+static char *tags[NTIMER / 5];
 static int stack = 0;
 
 void timer_init() {
@@ -95,7 +95,7 @@ void timer_print(int verbose) {
 void timer_finalize() {
   for (int i = 0; i <= stack; i++) {
     if (tags[i])
-    free(tags[i]);
+      free(tags[i]);
   }
 }
 #undef NTIMER
