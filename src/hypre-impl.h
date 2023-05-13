@@ -86,10 +86,10 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
   HYPRE_IJMatrixAssemble(B->A);
   // HYPRE_IJMatrixPrint(B->A, "A.dat");
 
-  // chk_rt(gpuFree((void *)d_rows));
-  // chk_rt(gpuFree((void *)d_cols));
-  // chk_rt(gpuFree((void *)d_ncols));
-  // chk_rt(gpuFree((void *)d_vals));
+  chk_rt(gpuFree((void *)d_rows));
+  chk_rt(gpuFree((void *)d_cols));
+  chk_rt(gpuFree((void *)d_ncols));
+  chk_rt(gpuFree((void *)d_vals));
 
   // Create and initialize rhs and solution vectors
   HYPRE_IJVectorCreate(comm, lower, upper, &B->b);
@@ -102,42 +102,22 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
   HYPRE_IJVectorInitialize(B->x);
   HYPRE_IJVectorAssemble(B->x);
 
+  return B;
+}
+
+#define hypre_bench_run TOKEN_PASTE(GPU, _hypre_bench_run)
+void hypre_bench_run(char* str_solver, HYPRE_Solver solver, 
+                     HYPRE_Int (*PtrToFcn_Solve)(HYPRE_Solver, HYPRE_ParCSRMatrix, HYPRE_ParVector, HYPRE_ParVector),
+                     HYPRE_Int (*PtrToFcn_PrintLevel)(HYPRE_Solver, HYPRE_Int),
+                     struct hypre_csr* B,
+                     double *x, struct csr *A, const double *r,
+                     const struct lsbench *cb){
+
   HYPRE_ParVector par_b, par_x;
   HYPRE_ParCSRMatrix par_A;
   HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
   HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
   HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
-
-  if (cb->verbose > 1) {
-    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
-  }
-  HYPRE_BoomerAMGSetup(solver, par_A, par_b, par_x);
-
-
-            /* use two-step Jacobi as preconditioner */
-//            HYPRE_StructJacobiCreate(comm, &precond);
-//            HYPRE_ParCSRJacobiCreate(comm, &precond);
-/*            HYPRE_StructJacobiSetMaxIter(precond, 2);
-            HYPRE_StructJacobiSetTol(precond, 0.0);
-            HYPRE_StructJacobiSetZeroGuess(precond);
-            HYPRE_StructPCGSetPrecond( solver,
-                                       HYPRE_StructJacobiSolve,
-                                       HYPRE_StructJacobiSetup,
-                                       precond);
-*/
-  return B;
-}
-
-#define hypre_bench TOKEN_PASTE(GPU, _hypre_bench)
-int hypre_bench(double *x, struct csr *A, const double *r,
-                const struct lsbench *cb) {
-
-  if (!initialized) {
-    errx(EXIT_FAILURE, "Hypre is not initialized !\n");
-    return 1;
-  }
-
-  struct hypre_csr *B = csr_init(A, cb);
 
   unsigned nr = A->nrows, nnz = A->offs[nr];
   HYPRE_Real *d_r, *d_x;
@@ -146,7 +126,7 @@ int hypre_bench(double *x, struct csr *A, const double *r,
 
   HYPRE_Real *tmp = tcalloc(HYPRE_Real, nr);
   for (unsigned i = 0; i < nr; i++) {
-    tmp[i] = r[i];
+    tmp[i] = (HYPRE_Real) r[i];
     x[i] = 0.0;
   }
 
@@ -159,20 +139,14 @@ int hypre_bench(double *x, struct csr *A, const double *r,
 
   HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
   HYPRE_IJVectorUpdateValues(B->b, nr, NULL, d_r, 1);
-
-  HYPRE_ParVector par_x, par_b;
-  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
-  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
-
-  HYPRE_ParCSRMatrix par_A;
-  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
-
   // HYPRE_IJVectorPrint(B->b, "b.dat");
   // HYPRE_IJVectorPrint(B->x, "x.dat");
 
   if (cb->verbose > 1) {
-    HYPRE_BoomerAMGSetPrintLevel(solver, 2);
-    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+//    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    PtrToFcn_PrintLevel(solver, 3);
+    PtrToFcn_Solve(solver, par_A, par_b, par_x);
 
     int comm = 0;
     HYPRE_BigInt lower = A->base, upper = (HYPRE_BigInt)A->nrows - 1 + A->base;
@@ -191,16 +165,19 @@ int hypre_bench(double *x, struct csr *A, const double *r,
     HYPRE_ParCSRMatrixMatvec(-1.0, par_A, par_x, 1.0, par_e);
     HYPRE_ParVectorInnerProd(par_e, par_e, &norm);
     if (norm>0) norm = sqrt(norm);
-    printf("hypre norm(b-Ax) = %14.4e\n", norm);
+    printf("%s norm(b-Ax) = %14.4e\n", str_solver, norm);
+    fflush(stdout);
   
     HYPRE_IJVectorDestroy(rd);
   }
 
   // Warmup
-  HYPRE_BoomerAMGSetPrintLevel(solver, 0);
+//  HYPRE_BoomerAMGSetPrintLevel(solver, 0);
+  PtrToFcn_PrintLevel(solver, 0);
   for (unsigned i = 0; i < cb->trials; i++) {
     HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
-    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    PtrToFcn_Solve(solver, par_A, par_b, par_x);
   }
 
   // Time the solve
@@ -210,7 +187,8 @@ int hypre_bench(double *x, struct csr *A, const double *r,
 
     chk_rt(gpuDeviceSynchronize());
     timer_log(4, 0);
-    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    PtrToFcn_Solve(solver, par_A, par_b, par_x);
     chk_rt(gpuDeviceSynchronize());
     timer_log(4, 1);
   }
@@ -223,18 +201,15 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   chk_rt(gpuDeviceSynchronize());
   timer_log(5, 1);
 
-  timer_push("HYPRE AMG");
-
   chk_rt(gpuFree((void *)d_r));
   chk_rt(gpuFree((void *)d_x));
 
   for (unsigned i = 0; i < nr; i++)
     x[i] = tmp[i];
 
-  csr_finalize(B), tfree(tmp);
-  return 0;
+  tfree(tmp);
 }
 
 #undef chk_rt
 #undef csr_init
-#undef hypre_bench
+#undef hypre_bench_run

@@ -9,7 +9,7 @@
 #include <_hypre_utilities.h>
 
 static int initialized = 0;
-static HYPRE_Solver solver = 0, precond = 0;
+//static HYPRE_Solver solver = 0, precond = 0;
 
 struct hypre_csr {
   HYPRE_IJMatrix A;
@@ -40,6 +40,12 @@ int hypre_init() {
 
   HYPRE_SetUseGpuRand(1);
 
+  initialized = 1;
+  return 0;
+}
+
+HYPRE_Solver hypre_bench_AMG_setup(struct hypre_csr* B) {
+
   double params[NPARAM];
   params[0] = 8;    /* coarsening */
   params[1] = 6;    /* interpolation */
@@ -53,6 +59,7 @@ int hypre_init() {
   params[9] = 0;    /* agressive coarsening */
   params[10] = 2;   /* chebyRelaxOrder */
 
+  HYPRE_Solver solver=0;
   HYPRE_BoomerAMGCreate(&solver);
 
   HYPRE_BoomerAMGSetCoarsenType(solver, params[0]);
@@ -102,10 +109,15 @@ int hypre_init() {
   HYPRE_BoomerAMGSetMaxIter(solver, params[2]);
   HYPRE_BoomerAMGSetTol(solver, 0);
 
-  //  HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+  HYPRE_ParVector par_b, par_x;
+  HYPRE_ParCSRMatrix par_A;
+  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
+  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
+  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
 
-  initialized = 1;
-  return 0;
+  HYPRE_BoomerAMGSetup(solver, par_A, par_b, par_x);
+
+  return solver;
 }
 
 // hypre_bench for backends
@@ -127,7 +139,7 @@ int hypre_init() {
 
 #elif defined(ENABLE_DPCPP) // DPCPP (not implemented)
 #else                       // CPU
-static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
+static struct hypre_csr *cpu_csr_init(struct csr *A, const struct lsbench *cb) {
 
   struct hypre_csr *B = tcalloc(struct hypre_csr, 1);
 
@@ -172,23 +184,21 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
   HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
   HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
 
-  if (cb->verbose > 1) {
-    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
-  }
-  HYPRE_BoomerAMGSetup(solver, par_A, par_b, par_x);
-
   return B;
 }
 
-int cpu_hypre_bench(double *x, struct csr *A, const double *r,
-                const struct lsbench *cb) {
+void cpu_hypre_bench_run(char* str_solver, HYPRE_Solver solver, 
+                         HYPRE_Int (*PtrToFcn_Solve)(HYPRE_Solver, HYPRE_ParCSRMatrix, HYPRE_ParVector, HYPRE_ParVector),
+                         HYPRE_Int (*PtrToFcn_PrintLevel)(HYPRE_Solver, HYPRE_Int),
+                         struct hypre_csr* B,
+                         double *x, struct csr *A, const double *r,
+                         const struct lsbench *cb) {
 
-  if (!initialized) {
-    errx(EXIT_FAILURE, "Hypre is not initialized !\n");
-    return 1;
-  }
-
-  struct hypre_csr *B = csr_init(A, cb);
+  HYPRE_ParVector par_b, par_x;
+  HYPRE_ParCSRMatrix par_A;
+  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
+  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);  
+  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
 
   unsigned nr = A->nrows, nnz = A->offs[nr];
   HYPRE_Real *d_x = tcalloc(HYPRE_Real, nr);;
@@ -200,17 +210,20 @@ int cpu_hypre_bench(double *x, struct csr *A, const double *r,
 
   HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
   HYPRE_IJVectorUpdateValues(B->b, nr, NULL, d_r, 1);
-
+/*
   HYPRE_ParVector par_x, par_b;
   HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
   HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
 
   HYPRE_ParCSRMatrix par_A;
   HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
-
+*/
   if (cb->verbose > 1) {
-    HYPRE_BoomerAMGSetPrintLevel(solver, 2);
-    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+//    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
+//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    PtrToFcn_PrintLevel(solver, 3);
+    PtrToFcn_Solve(solver, par_A, par_b, par_x);
+
 
     int comm = 0;
     HYPRE_BigInt lower = A->base, upper = (HYPRE_BigInt)A->nrows - 1 + A->base;
@@ -229,16 +242,19 @@ int cpu_hypre_bench(double *x, struct csr *A, const double *r,
     HYPRE_ParCSRMatrixMatvec(-1.0, par_A, par_x, 1.0, par_e); 
     HYPRE_ParVectorInnerProd(par_e, par_e, &norm);
     if (norm>0) norm = sqrt(norm);
-    printf("hypre norm(b-Ax) = %14.4e\n", norm);
+    printf("%s norm(b-Ax) = %14.4e\n", str_solver, norm);
+    fflush(stdout);
 
     HYPRE_IJVectorDestroy(rd);
   }
 
   // Warmup
-  HYPRE_BoomerAMGSetPrintLevel(solver, 0);
+//  HYPRE_BoomerAMGSetPrintLevel(solver, 0);
+  PtrToFcn_PrintLevel(solver, 0);
   for (unsigned i = 0; i < cb->trials; i++) {
     HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
-    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+//    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
+    PtrToFcn_Solve(solver, par_A, par_b, par_x);
   }
 
   // Time the solve
@@ -255,10 +271,40 @@ int cpu_hypre_bench(double *x, struct csr *A, const double *r,
 
   tfree(d_r);
   tfree(d_x);
-  csr_finalize(B);
-  return 0;
 }
 #endif // hypre_bench for backends
+
+void hypre_bench_run(char* str_solver, HYPRE_Solver solver,
+                     HYPRE_Int (*PtrToFcn_Solve)(HYPRE_Solver, HYPRE_ParCSRMatrix, HYPRE_ParVector, HYPRE_ParVector),
+                     HYPRE_Int (*PtrToFcn_PrintLevel)(HYPRE_Solver, HYPRE_Int),
+                     struct hypre_csr* B,
+                     double *x, struct csr *A, const double *r,
+                     const struct lsbench *cb) {
+#if defined(ENABLE_CUDA)
+  cuda_hypre_bench_run(str_solver, solver, PtrToFcn_Solve, PtrToFcn_PrintLevel, B, x, A, r, cb);
+#elif defined(ENABLE_HIP)
+  hip_hypre_bench_run(str_solver, solver, PtrToFcn_Solve, PtrToFcn_PrintLevel, B, x, A, r, cb);
+#elif defined(ENABLE_DPCPP)
+  errx(EXIT_FAILURE, "hypre_bench_run not implemented !");
+#else // CPU
+  cpu_hypre_bench_run(str_solver, solver, PtrToFcn_Solve, PtrToFcn_PrintLevel, B, x, A, r, cb);
+#endif
+  timer_push(str_solver);
+}
+
+struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
+#if defined(ENABLE_CUDA)
+  return cuda_csr_init(A, cb);
+#elif defined(ENABLE_HIP)
+  return hip_csr_init(A, cb);
+#elif defined(ENABLE_DPCPP)
+  errx(EXIT_FAILURE, "csr_init not implemented !");
+  return 1;
+#else // CPU
+  return cpu_csr_init(A, cb);
+#endif
+}
+
 
 int hypre_bench(double *x, struct csr *A, const double *r,
                 const struct lsbench *cb) {
@@ -267,28 +313,63 @@ int hypre_bench(double *x, struct csr *A, const double *r,
     errx(EXIT_FAILURE, "Requsted Precisions not supported !");
     return 1;
   }
-
   if (cb->verbose > 0) {
     printf("Precision: %d bytes.\n", sizeof(HYPRE_Real));
     fflush(stdout);
   }
-#if defined(ENABLE_CUDA)
-  return cuda_hypre_bench(x, A, r, cb);
-#elif defined(ENABLE_HIP)
-  return hip_hypre_bench(x, A, r, cb);
-#elif defined(ENABLE_DPCPP)
-  errx(EXIT_FAILURE, "hypre_bench not implemented !");
-  return 1;
-#else // CPU
-  return cpu_hypre_bench(x, A, r, cb);
-#endif
+  if (!initialized) {
+    errx(EXIT_FAILURE, "Hypre is not initialized !\n");
+    return 1;
+  }
+
+  struct hypre_csr *B = csr_init(A, cb);
+
+  // Benchmark AMG.
+  timer_log(2,0);
+  HYPRE_Solver solver = hypre_bench_AMG_setup(B);
+  timer_log(2,1);
+  hypre_bench_run("HYPRE AMG", solver, 
+                  HYPRE_BoomerAMGSolve, HYPRE_BoomerAMGSetPrintLevel,
+                  B, x, A, r, cb);
+  HYPRE_BoomerAMGDestroy(solver);
+
+/*
+  // Benchmark PCG + AMG
+  timer_log(2,0);
+
+  HYPRE_Solver precond = hypre_bench_AMG_setup(B);
+
+  int comm = 0;
+  HYPRE_ParCSRPCGCreate(comm, &solver);
+
+  HYPRE_PCGSetMaxIter(solver, 1000); 
+  HYPRE_PCGSetTol(solver, 1e-6); 
+  HYPRE_PCGSetTwoNorm(solver, 1); 
+//  HYPRE_PCGSetLogging(solver, 1);
+
+  HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSolve,
+                      (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSetup, precond);
+
+  HYPRE_ParCSRPCGSetup(solver, parcsr_A, par_b, par_x);
+
+  HYPRE_ParCSRPCGSolve(solver, parcsr_A, par_b, par_x);
+HYPRE_Int HYPRE_ParCSRPCGSolve(HYPRE_Solver solver, HYPRE_ParCSRMatrix A, HYPRE_ParVector b, HYPRE_ParVector x)
+
+  timer_log(2,1);
+  hypre_bench_run("HYPRE PCG+AMG", solver, B, x, A, r, cb);
+  HYPRE_BoomerAMGDestroy(solver);
+*/
+
+
+  csr_finalize(B);
+
+  return 0;
 }
 
 int hypre_finalize() {
   if (!initialized)
     return 1;
 
-  HYPRE_BoomerAMGDestroy(solver);
   HYPRE_Finalize();
   initialized = 0;
   return 0;
