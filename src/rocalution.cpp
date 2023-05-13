@@ -132,7 +132,7 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
     _rocalution_sync();
     timer_log(4, 0);
 
-    // roc_x.Zeros();
+    roc_x.Zeros();
     ls.Solve(roc_r, &roc_x);
 
     _rocalution_sync();
