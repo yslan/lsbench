@@ -78,6 +78,7 @@ void timer_print(int verbose) {
   printf("Runtime Statistics    (min / max / sum)        ncall  tave \n");
   printf("Library Init  :");
   timer_print_line(1);
+  if (stack==0) stack++; // in case timer_push is never called.
   for (int i = 0; i < stack; i++) {
     printf("%s:\n", tags[i]);
     printf("  Solver Setup:");

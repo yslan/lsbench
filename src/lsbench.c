@@ -239,10 +239,11 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
       printf("res (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(rd, m),
              glmax(rd, m), glamax(rd, m));
     }
-    printf("norm(b-Ax) = %14.4e norm(b) = %14.4e  norm(x) = %14.4e\n",
-           l2norm(rd, m), l2norm(r, m), l2norm(x, m));
 
+    printf("\n");
     printf("Solver: %s.\n", cb->solver_str);
+    printf("Final Residual:  norm(b-Ax) = %14.4e norm(b) = %14.4e  norm(x) = %14.4e\n",
+           l2norm(rd, m), l2norm(r, m), l2norm(x, m));
     printf("Matrix: %s,  nrow = %d nnz = %d.\n", cb->matrix, A->nrows,
            A->offs[A->nrows]);
     fflush(stdout);
