@@ -260,19 +260,20 @@ int hypre_bench(double *x, struct csr *A, const double *r,
     return 1;
   }
 
-#if defined(ENABLE_CUDA)
-  return cuda_hypre_bench(x, A, r, cb);
-#elif defined(ENABLE_HIP)
-  return hip_hypre_bench(x, A, r, cb);
-#else
-  errx(EXIT_FAILURE, "hypre_bench not implemented !");
-  return 1;
-#endif
-
+#if defined(ENABLE_CUDA) || defined(ENABLE_HIP)
   if (cb->verbose > 0) {
     printf("Precision: %d bytes.\n", sizeof(HYPRE_Real));
     fflush(stdout);
   }
+#if defined(ENABLE_CUDA)
+  return cuda_hypre_bench(x, A, r, cb);
+#elif defined(ENABLE_HIP)
+  return hip_hypre_bench(x, A, r, cb);
+#endif
+#else
+  errx(EXIT_FAILURE, "hypre_bench not implemented !");
+  return 1;
+#endif
 }
 
 int hypre_finalize() {

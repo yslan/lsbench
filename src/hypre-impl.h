@@ -125,11 +125,6 @@ int hypre_bench(double *x, struct csr *A, const double *r,
     return 1;
   }
 
-  if (cb->verbose > 0) {
-    printf("precision: %d bit \n", sizeof(HYPRE_Real));
-    fflush(stdout);
-  }
-
   struct hypre_csr *B = csr_init(A, cb);
 
   unsigned nr = A->nrows, nnz = A->offs[nr];
