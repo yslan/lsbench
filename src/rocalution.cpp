@@ -87,17 +87,6 @@ static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
     timer_log(4, 1);
   }
 
-  // Move objects to accelerator
-  _rocalution_sync();
-  timer_log(3, 0);
-
-  roc_mat.MoveToAccelerator();
-  roc_x.MoveToAccelerator();
-  roc_r.MoveToAccelerator();
-
-  _rocalution_sync();
-  timer_log(3, 1);
-
   // copy sol back
   _rocalution_sync();
   timer_log(5, 0);
@@ -107,6 +96,7 @@ static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
   _rocalution_sync();
   timer_log(5, 1);
 
+  // Free all allocated data
   ls.Clear(), p.Clear();
 }
 
@@ -243,17 +233,6 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
     timer_log(4, 1);
   }
 
-  // Move objects to accelerator
-  _rocalution_sync();
-  timer_log(3, 0);
-
-  roc_mat.MoveToAccelerator();
-  roc_x.MoveToAccelerator();
-  roc_r.MoveToAccelerator();
-
-  _rocalution_sync();
-  timer_log(3, 1);
-
   // copy sol back
   _rocalution_sync();
   timer_log(5, 0);
@@ -263,8 +242,8 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
   _rocalution_sync();
   timer_log(5, 1);
 
-  ls.Clear();
   // Free all allocated data
+  ls.Clear();
   for (int i = 0; i < levels - 1; ++i) {
     delete p[i];
     delete sm[i];
@@ -312,11 +291,23 @@ static int bench_aux(double *x, struct csr *A, const double *r,
   // invalid.
   roc_mat.SetDataPtrCSR(&csr_row_ptr, &csr_col_ind, &csr_val, "roc_mat", nnz,
                         nr, nr);
-
-  // Benchmark PCG + Jacoib.
   for (int i = 0; i < nr; i++)
     roc_r[i] = r[i];
+
+  // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3, 0);
+
+  roc_mat.MoveToAccelerator();
+  roc_x.MoveToAccelerator();
+  roc_r.MoveToAccelerator();
+
+  _rocalution_sync();
+  timer_log(3, 1);
+
+  // Benchmark PCG + Jacoib.
   bench_pcg_jacobi<T>(roc_mat, roc_x, roc_r, cb);
+
   for (int i = 0; i < nr; i++)
     x[i] = roc_x[i];
 
