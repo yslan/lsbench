@@ -223,6 +223,8 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   chk_rt(gpuDeviceSynchronize());
   timer_log(5, 1);
 
+  timer_push("HYPRE AMG");
+
   chk_rt(gpuFree((void *)d_r));
   chk_rt(gpuFree((void *)d_x));
 

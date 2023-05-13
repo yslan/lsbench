@@ -20,6 +20,17 @@ int rocalution_init() {
 template <typename T>
 static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
                              LocalVector<T> &roc_r, const struct lsbench *cb) {
+  // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3, 0);
+
+  roc_mat.MoveToAccelerator();
+  roc_x.MoveToAccelerator();
+  roc_r.MoveToAccelerator();
+
+  _rocalution_sync();
+  timer_log(3, 1);
+
   // Linear Solver Setup.
   _rocalution_sync();
   timer_log(2, 0);
@@ -61,9 +72,9 @@ static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
     roc_e.ScaleAdd(-1.0, roc_r);
 
     T error = roc_e.Norm();
-    printf("rocalution norm(b-Ax) = %14.4e \n",error);
-    fflush(stdout); 
-      
+    printf("rocalution pcg+jacobi norm(b-Ax) = %14.4e \n", error);
+    fflush(stdout);
+
     roc_e.Clear();
   }
 
@@ -103,6 +114,17 @@ static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
 template <typename T>
 static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
                          LocalVector<T> &roc_r, const struct lsbench *cb) {
+  // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3, 0);
+
+  roc_mat.MoveToAccelerator();
+  roc_x.MoveToAccelerator();
+  roc_r.MoveToAccelerator();
+
+  _rocalution_sync();
+  timer_log(3, 1);
+
   // Linear Solver Setup.
   _rocalution_sync();
   timer_log(2, 0);
@@ -128,6 +150,9 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
   // Set coarsening strategy
   ls.SetCoarseningStrategy(CoarseningStrategy::Greedy);
   // ls.SetCoarseningStrategy(CoarseningStrategy::PMIS);
+
+  // Build AMG hierarchy
+  ls.BuildHierarchy();
 
   // Coarse Grid Solver
   CG<LocalMatrix<T>, LocalVector<T>, T> cgs;
@@ -207,8 +232,8 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
     roc_e.ScaleAdd(-1.0, roc_r);
 
     T error = roc_e.Norm();
-    printf("rocalution norm(b-Ax) = %14.4e \n",error);
-    fflush(stdout); 
+    printf("rocalution amg norm(b-Ax) = %14.4e \n", error);
+    fflush(stdout);
 
     roc_e.Clear();
   }
@@ -266,6 +291,9 @@ static int bench_aux(double *x, struct csr *A, const double *r,
     info_rocalution();
 
   // rocALUTION objects.
+  _rocalution_sync();
+  timer_log(1, 0);
+
   int nr = A->nrows, nnz = A->offs[nr];
   LocalVector<T> roc_x, roc_r;
   LocalMatrix<T> roc_mat;
@@ -294,19 +322,17 @@ static int bench_aux(double *x, struct csr *A, const double *r,
   for (int i = 0; i < nr; i++)
     roc_r[i] = r[i];
 
-  // Move objects to accelerator
   _rocalution_sync();
-  timer_log(3, 0);
-
-  roc_mat.MoveToAccelerator();
-  roc_x.MoveToAccelerator();
-  roc_r.MoveToAccelerator();
-
-  _rocalution_sync();
-  timer_log(3, 1);
+  timer_log(1, 1);
 
   // Benchmark PCG + Jacoib.
   bench_pcg_jacobi<T>(roc_mat, roc_x, roc_r, cb);
+
+  timer_push("rocALUTION PCG+Jacobi");
+
+  bench_sa_amg<T>(roc_mat, roc_x, roc_r, cb);
+
+  timer_push("rocALUTION AMG");
 
   for (int i = 0; i < nr; i++)
     x[i] = roc_x[i];

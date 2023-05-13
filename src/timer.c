@@ -2,7 +2,7 @@
 #include <float.h>
 #include <math.h>
 
-#define NTIMER 20
+#define NTIMER 100
 
 struct my_timer {
   double tmin, tmax, tsum;
@@ -11,8 +11,11 @@ struct my_timer {
 };
 
 static struct my_timer timer[NTIMER];
+static char* tags[NTIMER/5];
+static int stack = 0;
 
-void timer_init(int max) {
+void timer_init() {
+  stack = 0;
   for (int i = 1; i < NTIMER; i++) {
     timer[i].tmin = DBL_MAX;
     timer[i].tmax = -DBL_MIN;
@@ -21,21 +24,26 @@ void timer_init(int max) {
   }
 }
 
+void timer_push(const char *tag) {
+  tags[stack] = strndup(tag, BUFSIZ);
+  stack++;
+}
+
 // TODO: add sync in this routine.
 void timer_log(const int id, const int mode) {
   // tic
   if (mode == 0) {
-    timer[id].tic = clock();
+    timer[5 * stack + id].tic = clock();
     return;
   }
 
   // toc
   clock_t t = clock() - timer[id].tic;
   double tsec = (double)t / CLOCKS_PER_SEC;
-  timer[id].tmin = fmin(timer[id].tmin, tsec);
-  timer[id].tmax = fmax(timer[id].tmax, tsec);
-  timer[id].tsum += tsec;
-  timer[id].ncalls++;
+  timer[5 * stack + id].tmin = fmin(timer[id].tmin, tsec);
+  timer[5 * stack + id].tmax = fmax(timer[id].tmax, tsec);
+  timer[5 * stack + id].tsum += tsec;
+  timer[5 * stack + id].ncalls++;
 }
 
 void timer_print_line(const int i) {
@@ -68,17 +76,26 @@ void timer_print(int verbose) {
   }
 
   printf("Runtime Statistics    (min / max / sum)        ncall  tave \n");
-  printf("  Lib Init.      ");
+  printf("Library Init  :");
   timer_print_line(1);
-  printf("  Solver Setup   ");
-  timer_print_line(2);
-  printf("  Solver Solve   ");
-  timer_print_line(4);
-  printf("  HostToDevice   ");
-  timer_print_line(3);
-  printf("  DeviceToHost   ");
-  timer_print_line(5);
-  printf("\n\n");
+  for (int i = 0; i < stack; i++) {
+    printf("%s:\n", tags[i]);
+    printf("  Solver Setup:");
+    timer_print_line(5 * i + 2);
+    printf("  Solver Solve:");
+    timer_print_line(5 * i + 4);
+    printf("  HostToDevice:");
+    timer_print_line(5 * i + 3);
+    printf("  DeviceToHost:");
+    timer_print_line(5 * i + 5);
+    printf("\n");
+  }
 }
 
+void timer_finalize() {
+  for (int i = 0; i <= stack; i++) {
+    if (tags[i])
+    free(tags[i]);
+  }
+}
 #undef NTIMER
