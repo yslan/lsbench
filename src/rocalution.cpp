@@ -328,11 +328,11 @@ static int bench_aux(double *x, struct csr *A, const double *r,
   // Benchmark PCG + Jacoib.
   bench_pcg_jacobi<T>(roc_mat, roc_x, roc_r, cb);
 
-  timer_push();
+  timer_push("rocALUTION PCG+Jacobi");
 
   bench_sa_amg<T>(roc_mat, roc_x, roc_r, cb);
 
-  timer_push();
+  timer_push("rocALUTION AMG");
 
   for (int i = 0; i < nr; i++)
     x[i] = roc_x[i];

@@ -51,7 +51,7 @@ void lsbench_finalize(struct lsbench *cb);
 
 void timer_init();
 void timer_log(const int id, const int mode);
-void timer_push();
+void timer_push(const char *tag);
 void timer_print_line(const int i);
 void timer_print(int verbose);
 

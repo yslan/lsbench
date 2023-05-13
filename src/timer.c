@@ -11,6 +11,7 @@ struct my_timer {
 };
 
 static struct my_timer timer[NTIMER];
+static char* tags[NTIMER/5];
 static int stack = 0;
 
 void timer_init() {
@@ -23,7 +24,10 @@ void timer_init() {
   }
 }
 
-void timer_push() { stack++; }
+void timer_push(const char *tag) {
+  tags[stack] = strndup(tag, BUFSIZ);
+  stack++;
+}
 
 // TODO: add sync in this routine.
 void timer_log(const int id, const int mode) {
@@ -75,6 +79,7 @@ void timer_print(int verbose) {
   printf("Library Init  :");
   timer_print_line(1);
   for (int i = 0; i < stack; i++) {
+    printf("%s:\n", tags[i]);
     printf("  Solver Setup:");
     timer_print_line(5 * i + 2);
     printf("  Solver Solve:");
@@ -83,7 +88,7 @@ void timer_print(int verbose) {
     timer_print_line(5 * i + 3);
     printf("  DeviceToHost:");
     timer_print_line(5 * i + 5);
-    printf("\n\n");
+    printf("\n");
   }
 }
 
