@@ -2,7 +2,7 @@
 #include <float.h>
 #include <math.h>
 
-#define NTIMER 10
+#define NTIMER 20
 
 struct my_timer {
   double tmin, tmax, tsum;
@@ -12,7 +12,7 @@ struct my_timer {
 
 static struct my_timer timer[NTIMER];
 
-void timer_init() {
+void timer_init(int max) {
   for (int i = 1; i < NTIMER; i++) {
     timer[i].tmin = DBL_MAX;
     timer[i].tmax = -DBL_MIN;

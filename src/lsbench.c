@@ -130,6 +130,7 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
     case 70:
       print_help(argc, argv);
       exit(EXIT_SUCCESS);
+      break;
     default:
       print_help(argc, argv);
       exit(EXIT_FAILURE);
@@ -141,7 +142,7 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
   if (cb->matrix == NULL)
     errx(EXIT_FAILURE, "Input matrix file not provided. Try `--help`.");
 
-  timer_init();
+  timer_init(2);
 
   return cb;
 }
