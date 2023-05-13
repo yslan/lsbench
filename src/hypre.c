@@ -364,7 +364,7 @@ int hypre_bench(double *x, struct csr *A, const double *r,
 
   if (cb->verbose>1) { // Run info - needed logging turned on
     int num_iterations=0;
-    HYPRE_Real final_res_norm=0;
+    HYPRE_Real final_res_norm=0.0;
 
     HYPRE_PCGGetNumIterations(solver, &num_iterations);
     HYPRE_PCGGetFinalRelativeResidualNorm(solver, &final_res_norm);

@@ -40,8 +40,8 @@ void timer_log(const int id, const int mode) {
   // toc
   clock_t t = clock() - timer[id].tic;
   double tsec = (double)t / CLOCKS_PER_SEC;
-  timer[5 * stack + id].tmin = fmin(timer[id].tmin, tsec);
-  timer[5 * stack + id].tmax = fmax(timer[id].tmax, tsec);
+  timer[5 * stack + id].tmin = fmin(timer[5 * stack + id].tmin, tsec);
+  timer[5 * stack + id].tmax = fmax(timer[5 * stack + id].tmax, tsec);
   timer[5 * stack + id].tsum += tsec;
   timer[5 * stack + id].ncalls++;
 }
