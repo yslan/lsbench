@@ -111,6 +111,171 @@ static void bench_pcg_jacobi(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
 }
 
 template <typename T>
+static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
+                         LocalVector<T> &roc_r, const struct lsbench *cb) {
+  // Linear Solver Setup.
+  _rocalution_sync();
+  timer_log(2, 0);
+
+  // Linear Solver
+  SAAMG<LocalMatrix<double>, LocalVector<double>, double> ls;
+
+  // Set solver operator
+  ls.SetOperator(roc_mat);
+
+  // Set coupling strength
+  ls.SetCouplingStrength(0.001);
+  // Set maximal number of unknowns on coarsest level
+  ls.SetCoarsestLevel(200);
+  // Set relaxation parameter for smoothed interpolation aggregation
+  ls.SetInterpRelax(2. / 3.);
+  // Set manual smoothers
+  ls.SetManualSmoothers(true);
+  // Set manual course grid solver
+  ls.SetManualSolver(true);
+  // Set grid transfer scaling
+  ls.SetScaling(true);
+  // Set coarsening strategy
+  ls.SetCoarseningStrategy(CoarseningStrategy::Greedy);
+  // ls.SetCoarseningStrategy(CoarseningStrategy::PMIS);
+
+  // Coarse Grid Solver
+  CG<LocalMatrix<double>, LocalVector<double>, double> cgs;
+  cgs.Verbose(0);
+
+  // Obtain number of AMG levels
+  int levels = ls.GetNumLevels();
+
+  // Smoother for each level
+  IterativeLinearSolver<LocalMatrix<double>, LocalVector<double>, double> **sm =
+      new IterativeLinearSolver<LocalMatrix<double>, LocalVector<double>,
+                                double> *[levels - 1];
+  Preconditioner<LocalMatrix<double>, LocalVector<double>, double> **p =
+      new Preconditioner<LocalMatrix<double>, LocalVector<double>, double>
+          *[levels - 1];
+
+  std::string preconditioner = "Jacobi";
+
+  // Initialize smoother for each level
+  for (int i = 0; i < levels - 1; ++i) {
+    FixedPoint<LocalMatrix<double>, LocalVector<double>, double> *fp;
+    fp = new FixedPoint<LocalMatrix<double>, LocalVector<double>, double>;
+    fp->SetRelaxation(1.3);
+    sm[i] = fp;
+
+    if (preconditioner == "GS") {
+      p[i] = new GS<LocalMatrix<double>, LocalVector<double>, double>;
+    } else if (preconditioner == "SGS") {
+      p[i] = new SGS<LocalMatrix<double>, LocalVector<double>, double>;
+    } else if (preconditioner == "ILU") {
+      p[i] = new ILU<LocalMatrix<double>, LocalVector<double>, double>;
+    } else if (preconditioner == "IC") {
+      p[i] = new IC<LocalMatrix<double>, LocalVector<double>, double>;
+    } else {
+      p[i] = new Jacobi<LocalMatrix<double>, LocalVector<double>, double>;
+    }
+
+    sm[i]->SetPreconditioner(*p[i]);
+    sm[i]->Verbose(0);
+  }
+
+  // Pass smoother and coarse grid solver to AMG
+  ls.SetSmoother(sm);
+  ls.SetSolver(cgs);
+
+  // Set number of pre and post smoothing steps
+  ls.SetSmootherPreIter(1);
+  ls.SetSmootherPostIter(2);
+
+  ls.SetResidualNorm(2);
+
+  ls.Build();
+
+  const int maxit = 10000;
+  const T abs_tol = 1e-8, rel_tol = 1e-6, div_tol = 1e6;
+  ls.InitMaxIter(maxit);
+  ls.InitTol(abs_tol, rel_tol, div_tol);
+
+  _rocalution_sync();
+  timer_log(2, 1);
+
+  // Print matrix info
+  if (cb->verbose > 1) {
+    roc_mat.Info();
+    roc_x.Info();
+    roc_r.Info();
+
+    ls.Verbose(1);
+    roc_x.Zeros();
+    ls.Solve(roc_r, &roc_x);
+
+    // Compute error L2 norm
+    LocalVector<T> roc_e;
+    roc_e.Allocate("roc_e", roc_r.GetSize());
+    roc_e.MoveToAccelerator();
+    roc_e.Zeros();
+    roc_mat.Apply(roc_x, &roc_e);
+    roc_e.ScaleAdd(-1.0, roc_r);
+
+    T error = roc_e.Norm();
+    std::cout << "rocalution norm(Ax-b) = " << error << std::endl;
+  }
+
+  // Initial zero guess
+  roc_x.Zeros();
+
+  // Warmup
+  ls.Verbose(0);
+  for (unsigned i = 0; i < cb->trials; i++) {
+    roc_x.Zeros();
+    ls.Solve(roc_r, &roc_x);
+  }
+
+  // Time the solve
+  for (unsigned i = 0; i < cb->trials; i++) {
+    roc_x.Zeros();
+
+    _rocalution_sync();
+    timer_log(4, 0);
+
+    ls.Solve(roc_r, &roc_x);
+
+    _rocalution_sync();
+    timer_log(4, 1);
+  }
+
+  // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3, 0);
+
+  roc_mat.MoveToAccelerator();
+  roc_x.MoveToAccelerator();
+  roc_r.MoveToAccelerator();
+
+  _rocalution_sync();
+  timer_log(3, 1);
+
+  // copy sol back
+  _rocalution_sync();
+  timer_log(5, 0);
+
+  roc_x.MoveToHost();
+
+  _rocalution_sync();
+  timer_log(5, 1);
+
+  ls.Clear();
+  // Free all allocated data
+  for (int i = 0; i < levels - 1; ++i) {
+    delete p[i];
+    delete sm[i];
+  }
+
+  delete[] p;
+  delete[] sm;
+}
+
+template <typename T>
 static int bench_aux(double *x, struct csr *A, const double *r,
                      const struct lsbench *cb) {
   if (!initialized) {
