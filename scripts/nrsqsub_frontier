@@ -1,6 +1,6 @@
 #!/bin/bash
 
-: ${PROJ_ID:=""}
+: ${PROJ_ID:="CSC262"}
 : ${QUEUE:="batch"}
 
 if [ $# -ne 4 ]; then
@@ -61,7 +61,7 @@ MPICH_MPIIO_HINTS="*:cray_cb_write_lock_mode=2:cray_cb_nodes_multiplier=4:stripi
 SFILE=s.bin
 echo "#!/bin/bash" > $SFILE
 echo "#SBATCH -A $PROJ_ID" >>$SFILE
-echo "#SBATCH -J nekRS_$case" >>$SFILE
+echo "#SBATCH -J lsbench" >>$SFILE
 echo "#SBATCH -o %x-%j.out" >>$SFILE
 echo "#SBATCH -t $time" >>$SFILE
 echo "#SBATCH -N $nodes" >>$SFILE
