@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 struct lsbench {
-  char *matrix;
+  char *matrix, *solver_str;
   lsbench_solver_t solver;
   lsbench_ordering_t ordering;
   lsbench_precision_t precision;
