@@ -92,4 +92,10 @@ void timer_print(int verbose) {
   }
 }
 
+void timer_finalize() {
+  for (int i = 0; i <= stack; i++) {
+    if (tags[i])
+    free(tags[i]);
+  }
+}
 #undef NTIMER
