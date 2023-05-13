@@ -31,9 +31,9 @@ static lsbench_solver_t str_to_solver(const char *str) {
   } else if (strcmp(up, "GINKGO") == 0) {
     return LSBENCH_SOLVER_GINKGO;
   } else {
-    warnx("Invalid solver: \"%s\". Defaulting to CHOLMOD.", str);
-    return LSBENCH_SOLVER_CHOLMOD;
+    errx(EXIT_FAILURE, "Invalid solver: \"%s\".", str);
   }
+  return LSBENCH_SOLVER_NONE;
 }
 
 static lsbench_ordering_t str_to_ordering(const char *str) {
@@ -47,8 +47,8 @@ static lsbench_ordering_t str_to_ordering(const char *str) {
   } else if (strcmp(up, "METIS") == 0) {
     return LSBENCH_ORDERING_METIS;
   } else {
-    warnx("Invalid ordering: \"%s\". Defaulting to AMD.", str);
-    return LSBENCH_ORDERING_AMD;
+    errx(EXIT_FAILURE, "Invalid ordering: \"%s\".", str);
+    return LSBENCH_ORDERING_NONE;
   }
 }
 
@@ -63,8 +63,8 @@ static lsbench_precision_t str_to_precision(const char *str) {
   } else if (strcmp(up, "FP16") == 0) {
     return LSBENCH_PRECISION_FP16;
   } else {
-    warnx("Invalid precision: \"%s\". Defaulting to FP64.", str);
-    return LSBENCH_PRECISION_FP64;
+    errx(EXIT_FAILURE, "Invalid precision: \"%s\".");
+    return LSBENCH_PRECISION_NONE;
   }
 }
 
@@ -143,6 +143,7 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
     errx(EXIT_FAILURE, "Precisions other than FP64 are not implemented yet.");
 
   timer_init(cb->verbose);
+
   return cb;
 }
 
@@ -157,9 +158,10 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
 
   if (cb->verbose > 1) {
     printf("matrix size nr = %d   nnz = %d \n", m, A->offs[m]);
+    fflush(stdout);
   }
 
-  // initialize rhs, TODO: maybe make ||x||=1?
+  // Initialize rhs and make ||x|| = 1.
   int seed = 27; // seed of the random
   srand(seed);
   for (unsigned i = 0; i < m; i++)
@@ -169,8 +171,10 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     r[i] = r[i] / tmp;
   if (cb->verbose > 1) {
     tmp = l2norm(r, m);
-    printf("rhs initialized by rand() with seed = %d and RAND_MAX = %d\n", seed,
-           RAND_MAX, tmp);
+    printf("rhs initialized by rand() with seed = %d, RAND_MAX = %d and norm = "
+           "%lf\n",
+           seed, RAND_MAX, tmp);
+    fflush(stdout);
   }
 
   switch (cb->solver) {
@@ -246,10 +250,11 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     printf("Solver %d\n", cb->solver);
     printf("Matrix: %s,  nrow = %d nnz = %d\n", cb->matrix, A->nrows,
            A->offs[A->nrows]);
+    fflush(stdout);
     tfree(rd);
   }
 
-  tfree(x);
+  tfree(x), tfree(r);
 }
 
 void lsbench_finalize(struct lsbench *cb) {

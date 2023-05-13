@@ -17,6 +17,7 @@ typedef enum {
 } lsbench_solver_t;
 
 typedef enum {
+  LSBENCH_PRECISION_NONE = -1,
   LSBENCH_PRECISION_FP64 = 0,
   LSBENCH_PRECISION_FP32 = 1,
   LSBENCH_PRECISION_FP16 = 2
