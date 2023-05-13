@@ -27,13 +27,13 @@
 #define gpurtcGetProgramLog TOKEN_PASTE(RUNTIME, GetProgramLog)
 #define gpurtcDestroyProgram TOKEN_PASTE(RUNTIME, DestroyProgram)
 
-#define chk_rt(err)                                                                \
-  {                                                                                \
-    gpuError_t err_ = (err);                                                       \
-    if (err_ != gpuSuccess) {                                                      \
-      errx(EXIT_FAILURE, "%s:%d " TOSTRING(GPU) " error: %s", __FILE__, __LINE__,  \
-           gpuGetErrorString(err_));                                               \
-    }                                                                              \
+#define chk_rt(err)                                                            \
+  {                                                                            \
+    gpuError_t err_ = (err);                                                   \
+    if (err_ != gpuSuccess) {                                                  \
+      errx(EXIT_FAILURE, "%s:%d " TOSTRING(GPU) " error: %s", __FILE__,        \
+           __LINE__, gpuGetErrorString(err_));                                 \
+    }                                                                          \
   }
 
 #define csr_init TOKEN_PASTE(GPU, _csr_init)
@@ -61,26 +61,25 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
     ncols[r] = (HYPRE_Int)(A->offs[r + 1] - A->offs[r]);
   }
 
-
   HYPRE_BigInt *d_rows, *d_cols;
   chk_rt(gpuMalloc((void **)&d_rows, nr * sizeof(HYPRE_BigInt)));
   chk_rt(gpuMalloc((void **)&d_cols, nnz * sizeof(HYPRE_BigInt)));
   chk_rt(gpuMemcpy(d_rows, rows, nr * sizeof(HYPRE_BigInt),
-                    gpuMemcpyHostToDevice));
+                   gpuMemcpyHostToDevice));
   chk_rt(gpuMemcpy(d_cols, cols, nnz * sizeof(HYPRE_BigInt),
-                    gpuMemcpyHostToDevice));
+                   gpuMemcpyHostToDevice));
   tfree(rows), tfree(cols);
 
   HYPRE_Int *d_ncols;
   chk_rt(gpuMalloc((void **)&d_ncols, nr * sizeof(HYPRE_Int)));
-  chk_rt(gpuMemcpy(d_ncols, ncols, nr * sizeof(HYPRE_Int),
-                    gpuMemcpyHostToDevice));
+  chk_rt(
+      gpuMemcpy(d_ncols, ncols, nr * sizeof(HYPRE_Int), gpuMemcpyHostToDevice));
   tfree(ncols);
 
   HYPRE_Real *d_vals;
   chk_rt(gpuMalloc((void **)&d_vals, nnz * sizeof(HYPRE_Real)));
-  chk_rt(gpuMemcpy(d_vals, vals, nnz * sizeof(HYPRE_Real),
-                    gpuMemcpyHostToDevice));
+  chk_rt(
+      gpuMemcpy(d_vals, vals, nnz * sizeof(HYPRE_Real), gpuMemcpyHostToDevice));
   tfree(vals);
 
   HYPRE_IJMatrixSetValues(B->A, nr, d_ncols, d_rows, d_cols, d_vals);
@@ -136,10 +135,10 @@ int hypre_bench(double *x, struct csr *A, const double *r,
     tmp[i] = r[i];
 
   chk_rt(gpuDeviceSynchronize());
-  timer_log(3, 0); 
+  timer_log(3, 0);
   chk_rt(gpuMemcpy(d_r, tmp, nr * sizeof(HYPRE_Real), gpuMemcpyHostToDevice));
   chk_rt(gpuDeviceSynchronize());
-  timer_log(3, 1); 
+  timer_log(3, 1);
 
   HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
   HYPRE_IJVectorUpdateValues(B->b, nr, NULL, d_r, 1);
@@ -154,7 +153,7 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   // HYPRE_IJVectorPrint(B->b, "b.dat");
   // HYPRE_IJVectorPrint(B->x, "x.dat");
 
-  if (cb->verbose>1) {
+  if (cb->verbose > 1) {
     HYPRE_BoomerAMGSetPrintLevel(solver, 2);
     HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
   }
@@ -167,19 +166,19 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   // Time the solve
   for (unsigned i = 0; i < cb->trials; i++) {
     chk_rt(gpuDeviceSynchronize());
-    timer_log(4, 0); 
+    timer_log(4, 0);
     HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
     chk_rt(gpuDeviceSynchronize());
-    timer_log(4, 1); 
+    timer_log(4, 1);
   }
 
   HYPRE_IJVectorGetValues(B->x, nr, NULL, d_x);
 
   chk_rt(gpuDeviceSynchronize());
-  timer_log(5, 0); 
+  timer_log(5, 0);
   chk_rt(gpuMemcpy(tmp, d_x, nr * sizeof(HYPRE_Real), gpuMemcpyDeviceToHost));
   chk_rt(gpuDeviceSynchronize());
-  timer_log(5, 1); 
+  timer_log(5, 1);
 
   chk_rt(gpuFree((void *)d_r));
   chk_rt(gpuFree((void *)d_x));

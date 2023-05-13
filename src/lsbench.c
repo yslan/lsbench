@@ -243,8 +243,9 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     printf("norm(b-Ax) = %14.4e    norm(b) = %14.4e  norm(x) = %14.4e\n",
            l2norm(rd, m), l2norm(r, m), l2norm(x, m));
 
-    printf("Solver %d\n",cb->solver);
-    printf("Matrix: %s,  nrow = %d nnz = %d\n",cb->matrix, A->nrows, A->offs[A->nrows]); 
+    printf("Solver %d\n", cb->solver);
+    printf("Matrix: %s,  nrow = %d nnz = %d\n", cb->matrix, A->nrows,
+           A->offs[A->nrows]);
     tfree(rd);
   }
 

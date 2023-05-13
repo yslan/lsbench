@@ -91,7 +91,7 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   const int maxit = 10000;
   const double abs_tol = 1e-8, rel_tol = 1e-6, div_tol = 1e6;
   ls.InitMaxIter(maxit);
-  ls.InitTol(abs_tol,rel_tol,div_tol);
+  ls.InitTol(abs_tol, rel_tol, div_tol);
   timer_log(2, 1);
 
   // Initial zero guess
@@ -119,12 +119,11 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
     std::cout << "rocalution norm(Ax-b) = " << error << std::endl;
   }
 
-
   // Warmup
   ls.Verbose(0);
   for (unsigned i = 0; i < cb->trials; i++)
     roc_x.Zeros();
-    ls.Solve(roc_r, &roc_x);
+  ls.Solve(roc_r, &roc_x);
 
   // Time the solve
   for (unsigned i = 0; i < cb->trials; i++) {

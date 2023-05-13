@@ -64,7 +64,6 @@ void timer_print(int verbose) {
     }
   }
 
-
   int i;
   printf("Runtime Statistics    (min / max / sum)        ncall  tave \n");
   printf("  Lib Init.      ");

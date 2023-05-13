@@ -32,8 +32,8 @@ int hypre_init(struct lsbench *cb) {
   HYPRE_SetMemoryLocation(HYPRE_MEMORY_DEVICE);
   HYPRE_SetExecutionPolicy(HYPRE_EXEC_DEVICE);
 
-  if (cb->verbose>0) {
-    printf("precision: %d bit \n",sizeof(HYPRE_Real));
+  if (cb->verbose > 0) {
+    printf("precision: %d bit \n", sizeof(HYPRE_Real));
   }
 
   // Settings for cuda
@@ -130,9 +130,8 @@ int hypre_finalize() {
 #undef RUNTIME
 int hypre_bench(double *x, struct csr *A, const double *r,
                 const struct lsbench *cb) {
-  return cuda_hypre_bench(x,A,r,cb);
+  return cuda_hypre_bench(x, A, r, cb);
 }
-
 
 #elif defined(ENABLE_HIP) // HIP
 #include <hip/hip_runtime.h>
@@ -143,7 +142,7 @@ int hypre_bench(double *x, struct csr *A, const double *r,
 #undef RUNTIME
 int hypre_bench(double *x, struct csr *A, const double *r,
                 const struct lsbench *cb) {
-  return hip_hypre_bench(x,A,r,cb);
+  return hip_hypre_bench(x, A, r, cb);
 }
 
 #elif defined(ENABLE_DPCPP) // DPCPP (not implemented)
