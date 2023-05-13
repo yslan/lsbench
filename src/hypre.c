@@ -9,7 +9,6 @@
 #include <_hypre_utilities.h>
 
 static int initialized = 0;
-//static HYPRE_Solver solver = 0, precond = 0;
 
 struct hypre_csr {
   HYPRE_IJMatrix A;
@@ -242,7 +241,6 @@ void cpu_hypre_bench_run(char* str_solver, HYPRE_Solver solver,
 //    HYPRE_BoomerAMGSetPrintLevel(solver, 3);
 //    HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
     PtrToFcn_PrintLevel(solver, 3);
-    HYPRE_IJVectorUpdateValues(B->x, nr, NULL, d_x, 1);
     PtrToFcn_Solve(solver, par_A, par_b, par_x);
 
 

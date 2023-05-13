@@ -17,7 +17,7 @@ set -e -a
 : ${ENABLE_CHOLMOD:=0}
 : ${ENABLE_PARALMOND:=0}
 : ${ENABLE_ROCALUTION:=1}
-: ${ENABEL_GINKGO:=0}
+: ${ENABLE_GINKGO:=1}
 
 #########################################################################
 

@@ -156,11 +156,6 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
   double *r = tcalloc(double, m);
   double *x = tcalloc(double, m);
 
-  if (cb->verbose > 1) {
-    printf("matrix size nr = %d   nnz = %d \n", m, A->offs[m]);
-    fflush(stdout);
-  }
-
   // Initialize rhs and make ||x|| = 1.
   int seed = 27; // seed of the random
   srand(seed);
