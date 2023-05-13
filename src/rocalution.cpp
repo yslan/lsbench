@@ -118,7 +118,7 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
   timer_log(2, 0);
 
   // Linear Solver
-  SAAMG<LocalMatrix<double>, LocalVector<double>, double> ls;
+  SAAMG<LocalMatrix<T>, LocalVector<T>, T> ls;
 
   // Set solver operator
   ls.SetOperator(roc_mat);
@@ -140,39 +140,38 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
   // ls.SetCoarseningStrategy(CoarseningStrategy::PMIS);
 
   // Coarse Grid Solver
-  CG<LocalMatrix<double>, LocalVector<double>, double> cgs;
+  CG<LocalMatrix<T>, LocalVector<T>, T> cgs;
   cgs.Verbose(0);
 
   // Obtain number of AMG levels
   int levels = ls.GetNumLevels();
 
   // Smoother for each level
-  IterativeLinearSolver<LocalMatrix<double>, LocalVector<double>, double> **sm =
-      new IterativeLinearSolver<LocalMatrix<double>, LocalVector<double>,
-                                double> *[levels - 1];
-  Preconditioner<LocalMatrix<double>, LocalVector<double>, double> **p =
-      new Preconditioner<LocalMatrix<double>, LocalVector<double>, double>
+  IterativeLinearSolver<LocalMatrix<T>, LocalVector<T>, T> **sm =
+      new IterativeLinearSolver<LocalMatrix<T>, LocalVector<T>, T>
           *[levels - 1];
+  Preconditioner<LocalMatrix<T>, LocalVector<T>, T> **p =
+      new Preconditioner<LocalMatrix<T>, LocalVector<T>, T> *[levels - 1];
 
   std::string preconditioner = "Jacobi";
 
   // Initialize smoother for each level
   for (int i = 0; i < levels - 1; ++i) {
-    FixedPoint<LocalMatrix<double>, LocalVector<double>, double> *fp;
-    fp = new FixedPoint<LocalMatrix<double>, LocalVector<double>, double>;
+    FixedPoint<LocalMatrix<T>, LocalVector<T>, T> *fp;
+    fp = new FixedPoint<LocalMatrix<T>, LocalVector<T>, T>;
     fp->SetRelaxation(1.3);
     sm[i] = fp;
 
     if (preconditioner == "GS") {
-      p[i] = new GS<LocalMatrix<double>, LocalVector<double>, double>;
+      p[i] = new GS<LocalMatrix<T>, LocalVector<T>, T>;
     } else if (preconditioner == "SGS") {
-      p[i] = new SGS<LocalMatrix<double>, LocalVector<double>, double>;
+      p[i] = new SGS<LocalMatrix<T>, LocalVector<T>, T>;
     } else if (preconditioner == "ILU") {
-      p[i] = new ILU<LocalMatrix<double>, LocalVector<double>, double>;
+      p[i] = new ILU<LocalMatrix<T>, LocalVector<T>, T>;
     } else if (preconditioner == "IC") {
-      p[i] = new IC<LocalMatrix<double>, LocalVector<double>, double>;
+      p[i] = new IC<LocalMatrix<T>, LocalVector<T>, T>;
     } else {
-      p[i] = new Jacobi<LocalMatrix<double>, LocalVector<double>, double>;
+      p[i] = new Jacobi<LocalMatrix<T>, LocalVector<T>, T>;
     }
 
     sm[i]->SetPreconditioner(*p[i]);
