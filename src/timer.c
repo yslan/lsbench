@@ -29,7 +29,7 @@ void timer_push() { stack++; }
 void timer_log(const int id, const int mode) {
   // tic
   if (mode == 0) {
-    timer[id].tic = clock();
+    timer[5 * stack + id].tic = clock();
     return;
   }
 

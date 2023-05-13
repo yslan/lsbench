@@ -151,6 +151,9 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
   ls.SetCoarseningStrategy(CoarseningStrategy::Greedy);
   // ls.SetCoarseningStrategy(CoarseningStrategy::PMIS);
 
+  // Build AMG hierarchy
+  ls.BuildHierarchy();
+
   // Coarse Grid Solver
   CG<LocalMatrix<T>, LocalVector<T>, T> cgs;
   cgs.Verbose(0);
@@ -327,7 +330,9 @@ static int bench_aux(double *x, struct csr *A, const double *r,
 
   timer_push();
 
-  // bench_sa_amg<T>(roc_mat, roc_x, roc_r, cb);
+  bench_sa_amg<T>(roc_mat, roc_x, roc_r, cb);
+
+  timer_push();
 
   for (int i = 0; i < nr; i++)
     x[i] = roc_x[i];
