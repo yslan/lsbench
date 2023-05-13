@@ -96,6 +96,7 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
   // Create the struct and set defauls.
   struct lsbench *cb = tcalloc(struct lsbench, 1);
   cb->matrix = NULL, cb->verbose = 0, cb->trials = 100;
+  cb->precision = LSBENCH_PRECISION_FP32;
 
   // Parse the command line arguments.
   char bfr[BUFSIZ];
@@ -139,8 +140,6 @@ struct lsbench *lsbench_init(int argc, char *argv[]) {
   // Sanity checks and check for things which are not yet implemented.
   if (cb->matrix == NULL)
     errx(EXIT_FAILURE, "Input matrix file not provided. Try `--help`.");
-  if (cb->precision != LSBENCH_PRECISION_FP64)
-    errx(EXIT_FAILURE, "Precisions other than FP64 are not implemented yet.");
 
   timer_init(cb->verbose);
 
@@ -187,7 +186,7 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
     break;
   case LSBENCH_SOLVER_HYPRE:
     timer_log(1, 0);
-    hypre_init(cb);
+    hypre_init();
     timer_log(1, 1);
     hypre_bench(x, A, r, cb);
     hypre_finalize();
@@ -244,11 +243,11 @@ void lsbench_bench(struct csr *A, const struct lsbench *cb) {
       printf("res (min/max/amax)  %14.4e %14.4e %14.4e \n", glmin(rd, m),
              glmax(rd, m), glamax(rd, m));
     }
-    printf("norm(b-Ax) = %14.4e    norm(b) = %14.4e  norm(x) = %14.4e\n",
+    printf("norm(b-Ax) = %14.4e norm(b) = %14.4e  norm(x) = %14.4e\n",
            l2norm(rd, m), l2norm(r, m), l2norm(x, m));
 
-    printf("Solver %s\n", cb->solver_str);
-    printf("Matrix: %s,  nrow = %d nnz = %d\n", cb->matrix, A->nrows,
+    printf("Solver: %s.\n", cb->solver_str);
+    printf("Matrix: %s,  nrow = %d nnz = %d.\n", cb->matrix, A->nrows,
            A->offs[A->nrows]);
     fflush(stdout);
     tfree(rd);

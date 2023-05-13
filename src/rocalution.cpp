@@ -7,8 +7,6 @@ using namespace rocalution;
 
 static int initialized = 0;
 
-#define T double
-
 int rocalution_init() {
   if (initialized)
     return 1;
@@ -19,7 +17,8 @@ int rocalution_init() {
   return 0;
 }
 
-int rocalution_bench(double *x, struct csr *A, const double *r,
+template <typename T>
+int bench_aux(double *x, struct csr *A, const double *r,
                      const struct lsbench *cb) {
   if (!initialized) {
     errx(EXIT_FAILURE, "rocALUTION is not initialized !\n");
@@ -160,6 +159,29 @@ int rocalution_bench(double *x, struct csr *A, const double *r,
   delete csr_row_ptr, csr_col_ind, csr_val;
 
   return 0;
+}
+
+int rocalution_bench(double *x, struct csr *A, const double *r,
+                     const struct lsbench *cb) {
+  size_t prec;
+  int ret;
+  if (cb->precision == LSBENCH_PRECISION_FP64)  {
+    prec = sizeof(double);
+    ret = bench_aux<double>(x, A, r, cb);
+  } else if (cb->precision == LSBENCH_PRECISION_FP32) {
+    prec = sizeof(float);
+    ret = bench_aux<float>(x, A, r, cb);
+  } else  {
+    errx(EXIT_FAILURE, "Requsted Precisions not supported !");
+    return 1;
+  }
+
+  if (cb->verbose > 0) {
+    printf("Precision: %d bytes.\n", prec);
+    fflush(stdout);
+  }
+
+  return ret;
 }
 
 int rocalution_finalize() {

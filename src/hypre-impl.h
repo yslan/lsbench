@@ -120,8 +120,15 @@ static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
 int hypre_bench(double *x, struct csr *A, const double *r,
                 const struct lsbench *cb) {
 
-  if (!initialized)
+  if (!initialized) {
+    errx(EXIT_FAILURE, "Hypre is not initialized !\n");
     return 1;
+  }
+
+  if (cb->verbose > 0) {
+    printf("precision: %d bit \n", sizeof(HYPRE_Real));
+    fflush(stdout);
+  }
 
   struct hypre_csr *B = csr_init(A, cb);
 

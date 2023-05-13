@@ -1,8 +1,9 @@
 #include "lsbench-impl.h"
 #include <math.h>
 
-#if defined(LSBENCH_HYPRE)
 #define NPARAM 11
+
+#if defined(LSBENCH_HYPRE)
 #include <HYPRE.h>
 #include <HYPRE_parcsr_ls.h>
 #include <_hypre_utilities.h>
@@ -24,17 +25,13 @@ static void csr_finalize(struct hypre_csr *A) {
   tfree(A);
 }
 
-int hypre_init(struct lsbench *cb) {
+int hypre_init() {
   if (initialized)
     return 1;
 
   HYPRE_Init();
   HYPRE_SetMemoryLocation(HYPRE_MEMORY_DEVICE);
   HYPRE_SetExecutionPolicy(HYPRE_EXEC_DEVICE);
-
-  if (cb->verbose > 0) {
-    printf("precision: %d bit \n", sizeof(HYPRE_Real));
-  }
 
   // Settings for cuda
   HYPRE_Int spgemm_use_vendor = 0;
@@ -111,53 +108,29 @@ int hypre_init(struct lsbench *cb) {
   return 0;
 }
 
-int hypre_finalize() {
-  if (!initialized)
-    return 1;
-
-  HYPRE_BoomerAMGDestroy(solver);
-  HYPRE_Finalize();
-  initialized = 0;
-  return 0;
-}
-
-#if defined(ENABLE_CUDA)
+#if defined(ENABLE_CUDA) // CUDA
 #include <cuda_runtime.h>
+
 #define GPU cuda
 #define RUNTIME nvrtc
+
 #include "hypre-impl.h"
+
 #undef GPU
 #undef RUNTIME
-int hypre_bench(double *x, struct csr *A, const double *r,
-                const struct lsbench *cb) {
-  return cuda_hypre_bench(x, A, r, cb);
-}
 
 #elif defined(ENABLE_HIP) // HIP
 #include <hip/hip_runtime.h>
+
 #define GPU hip
 #define RUNTIME hiprtc
+
 #include "hypre-impl.h"
+
 #undef GPU
 #undef RUNTIME
-int hypre_bench(double *x, struct csr *A, const double *r,
-                const struct lsbench *cb) {
-  return hip_hypre_bench(x, A, r, cb);
-}
-
 #elif defined(ENABLE_DPCPP) // DPCPP (not implemented)
-int hypre_bench(double *x, struct csr *A, const double *r,
-                const struct lsbench *cb) {
-  return 1;
-}
-
-#else // HYPRE CPU
-/*
-int hypre_bench(double *x, struct csr *A, const double *r,
-                const struct lsbench *cb) {
-  return 1;
-}
-*/
+#else                       // CPU
 static struct hypre_csr *csr_init(struct csr *A, const struct lsbench *cb) {
   struct hypre_csr *B = tcalloc(struct hypre_csr, 1);
 
@@ -251,7 +224,6 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   for (unsigned i = 0; i < cb->trials; i++)
     HYPRE_BoomerAMGSolve(solver, par_A, par_b, par_x);
   t = clock() - t;
-  // FIXME: Print the solve times.
 
   HYPRE_IJVectorGetValues(B->x, nr, NULL, (HYPRE_Real *)x);
 
@@ -279,12 +251,47 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   return 0;
 }
 #endif
-#undef NPARAM
-#else // LSBENCH_HYPRE
+
+int hypre_bench(double *x, struct csr *A, const double *r,
+                const struct lsbench *cb) {
+  if ((cb->precision == LSBENCH_PRECISION_FP64 && sizeof(HYPRE_Real) != 8) ||
+      (cb->precision == LSBENCH_PRECISION_FP32 && sizeof(HYPRE_Real) != 4)) {
+    errx(EXIT_FAILURE, "Requsted Precisions not supported !");
+    return 1;
+  }
+
+#if defined(ENABLE_CUDA)
+  return cuda_hypre_bench(x, A, r, cb);
+#elif defined(ENABLE_HIP)
+  return hip_hypre_bench(x, A, r, cb);
+#else
+  errx(EXIT_FAILURE, "hypre_bench not implemented !");
+  return 1;
+#endif
+
+  if (cb->verbose > 0) {
+    printf("Precision: %d bytes.\n", sizeof(HYPRE_Real));
+    fflush(stdout);
+  }
+}
+
+int hypre_finalize() {
+  if (!initialized)
+    return 1;
+
+  HYPRE_BoomerAMGDestroy(solver);
+  HYPRE_Finalize();
+  initialized = 0;
+  return 0;
+}
+
+#else  // LSBENCH_HYPRE
 int hypre_init() { return 1; }
 int hypre_finalize() { return 1; }
 int hypre_bench(double *x, struct csr *A, const double *r,
                 const struct lsbench *cb) {
   return 1;
 }
-#endif
+#endif // LSBENCH_HYPRE
+
+#undef NPARAM
