@@ -119,21 +119,92 @@ HYPRE_Solver hypre_bench_AMG_setup(struct hypre_csr *B) {
   return solver;
 }
 
-HYPRE_Solver hypre_bench_PCG_setup(struct hypre_csr *B, HYPRE_Solver precond) {
+HYPRE_Solver hypre_bench_ILU_setup(struct hypre_csr *B) {
+
+  HYPRE_Int ilu_type = 1;         // 1 = Jacobi + ILUT, 11 = GMRES + ILUT
+  HYPRE_Int ilu_lfil = 0;          
+  HYPRE_Int ilu_reordering = 1;    // 1 = RCM
+  HYPRE_Int ilu_sm_max_iter = 1;   // loop (ILU)
+  HYPRE_Real ilu_droptol = 1.0e-02;
+  HYPRE_Int ilu_max_row_nnz = 100;
+  HYPRE_Int ilu_schur_max_iter = 1;
+  HYPRE_Real ilu_nsh_droptol = 1.0e-02;
+
+  HYPRE_Solver solver=0;
+  HYPRE_ILUCreate(&solver);
+  
+  HYPRE_ILUSetType(solver, ilu_type); // 11=GMRES + ILUT
+  HYPRE_ILUSetLevelOfFill(solver, ilu_lfil);
+  HYPRE_ILUSetLocalReordering(solver, ilu_reordering);
+//  HYPRE_ILUSetPrintLevel(solver, 2);
+  HYPRE_ILUSetMaxIter(solver, ilu_sm_max_iter);
+  HYPRE_ILUSetMaxNnzPerRow(solver, ilu_max_row_nnz);
+  HYPRE_ILUSetDropThreshold(solver, ilu_droptol);
+  HYPRE_ILUSetTol(solver, 0);          // 0 for precond
+  HYPRE_ILUSetSchurMaxIter( solver, ilu_schur_max_iter );
+
+  if (ilu_type == 20 || ilu_type == 21)  
+    HYPRE_ILUSetNSHDropThreshold( solver, ilu_nsh_droptol);
+
+  HYPRE_ParVector par_b, par_x;
+  HYPRE_ParCSRMatrix par_A;
+  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
+  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
+  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
+
+  HYPRE_ILUSetup(solver, par_A, par_b, par_x);
+
+  return solver;
+}
+
+// EUCLID
+HYPRE_Solver hypre_bench_EUCLID_setup(struct hypre_csr *B) {
+
+  int comm = 0;
+  HYPRE_Solver solver = 0;
+  HYPRE_EuclidCreate(comm, &solver);
+
+  HYPRE_EuclidSetLevel(solver,1);
+  HYPRE_EuclidSetBJ(solver, 0);
+  HYPRE_EuclidSetRowScale(solver, 0);
+  HYPRE_EuclidSetSparseA(solver,0);
+  HYPRE_EuclidSetRowScale(solver, 0);
+
+  HYPRE_EuclidSetMem(solver, 1);
+  HYPRE_EuclidSetStats(solver, 1); 
+//  HYPRE_EuclidSetILUT(solver, 1e-2); // sequenctially
+
+  HYPRE_ParVector par_b, par_x;
+  HYPRE_ParCSRMatrix par_A;
+  HYPRE_IJVectorGetObject(B->b, (void **)&par_b);
+  HYPRE_IJVectorGetObject(B->x, (void **)&par_x);
+  HYPRE_IJMatrixGetObject(B->A, (void **)&par_A);
+
+  HYPRE_EuclidSetup(solver, par_A, par_b, par_x);
+
+  return solver;
+}
+
+// PCG
+HYPRE_Solver hypre_bench_PCG_setup(struct hypre_csr *B, HYPRE_Solver precond,
+                                   HYPRE_PtrToSolverFcn HYPRE_FcnSolve,
+                                   HYPRE_PtrToSolverFcn HYPRE_FcnSetup) {
 
   int comm = 0;
   HYPRE_Solver solver = 0;
   HYPRE_ParCSRPCGCreate(comm, &solver);
 
-  HYPRE_ParCSRPCGSetMaxIter(solver, 1000);
+  HYPRE_ParCSRPCGSetMaxIter(solver, 10000);
   HYPRE_ParCSRPCGSetTol(solver, 1e-6);
   HYPRE_ParCSRPCGSetAbsoluteTol(solver, 1e-8);
   HYPRE_ParCSRPCGSetTwoNorm(solver, 1);
   HYPRE_ParCSRPCGSetLogging(solver,
                             1); // This is needed to extract final residual
 
-  HYPRE_PCGSetPrecond(solver, (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSolve,
-                      (HYPRE_PtrToSolverFcn)HYPRE_BoomerAMGSetup, precond);
+  HYPRE_PCGSetPrecond(solver, 
+                      (HYPRE_PtrToSolverFcn)HYPRE_FcnSolve,
+                      (HYPRE_PtrToSolverFcn)HYPRE_FcnSetup, 
+                      precond);
 
   HYPRE_ParVector par_b, par_x;
   HYPRE_ParCSRMatrix par_A;
@@ -362,11 +433,52 @@ int hypre_bench(double *x, struct csr *A, const double *r,
   // Benchmark PCG + AMG
   timer_log(2, 0);
   precond = hypre_bench_AMG_setup(B);
-  solver = hypre_bench_PCG_setup(B, precond);
+  solver = hypre_bench_PCG_setup(B, precond,
+                    (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSolve,
+                    (HYPRE_PtrToSolverFcn) HYPRE_BoomerAMGSetup);
   timer_log(2, 1);
   hypre_bench_run("HYPRE PCG+AMG", solver, HYPRE_ParCSRPCGSolve,
                   HYPRE_ParCSRPCGSetPrintLevel, B, x, A, r, cb);
+  HYPRE_BoomerAMGDestroy(precond);
+  HYPRE_ParCSRPCGDestroy(solver);
 
+
+  if (cb->trials <=10) { // Otherwise, it's too slow...
+    // ILU
+    timer_log(2, 0);
+    solver = hypre_bench_ILU_setup(B);
+    timer_log(2, 1);
+    hypre_bench_run("HYPRE ILUT", solver, HYPRE_ILUSolve,
+                    HYPRE_ILUSetPrintLevel, B, x, A, r, cb);
+    HYPRE_ILUDestroy(solver);
+
+    // PCG + ILU
+    timer_log(2, 0);
+    precond = hypre_bench_ILU_setup(B);
+    solver = hypre_bench_PCG_setup(B, precond, 
+                    (HYPRE_PtrToSolverFcn) HYPRE_ILUSolve, 
+                    (HYPRE_PtrToSolverFcn) HYPRE_ILUSetup);
+    timer_log(2, 1);
+    hypre_bench_run("HYPRE PCG + ILUT", solver, HYPRE_ParCSRPCGSolve,
+                    HYPRE_ParCSRPCGSetPrintLevel, B, x, A, r, cb);
+    HYPRE_ILUDestroy(precond);
+    HYPRE_ParCSRPCGDestroy(solver);
+
+/*
+    // PCG + EUCLID, FIXME, somehow gets zero in the first iteration
+    timer_log(2, 0);
+    precond = hypre_bench_EUCLID_setup(B);
+    solver = hypre_bench_PCG_setup(B, precond, 
+                    (HYPRE_PtrToSolverFcn) HYPRE_EuclidSolve, 
+                    (HYPRE_PtrToSolverFcn) HYPRE_EuclidSetup);
+    timer_log(2, 1);
+    hypre_bench_run("HYPRE PCG + EUCLID", solver, HYPRE_ParCSRPCGSolve,
+                    HYPRE_ParCSRPCGSetPrintLevel, B, x, A, r, cb);
+    HYPRE_EuclidDestroy(precond);
+    HYPRE_ParCSRPCGDestroy(solver);
+*/
+  }
+/*
   if (cb->verbose > 1) { // Run info - needed logging turned on
     int num_iterations = 0;
     HYPRE_Real final_res_norm = 0.0;
@@ -377,9 +489,7 @@ int hypre_bench(double *x, struct csr *A, const double *r,
     printf("Final Relative Residual Norm = %e\n", final_res_norm);
     fflush(stdout);
   }
-
-  HYPRE_ParCSRPCGDestroy(solver);
-  HYPRE_BoomerAMGDestroy(precond);
+*/
 
   csr_finalize(B);
 
