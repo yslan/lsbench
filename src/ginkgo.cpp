@@ -136,7 +136,7 @@ void ginkgo_bench_run(const char* str_solver,
            convergence_logger->has_converged() ? "true" : "false");
 
     printf("===matrix,n,nnz,trials,solver,ordering===\n");
-    printf("%s,%u,%u,%u,%u,%d,%.15lf\n", cb->matrix, m, nnz, cb->trials,
+    printf("%s,%u,%u,%u,%u,%d\n", cb->matrix, m, nnz, cb->trials,
            cb->solver, cb->ordering);
     fflush(stdout);
 
@@ -193,22 +193,74 @@ static int ginkgo_bench_aux(double *x, struct csr *A, const double *r,
 
   // BiCGSTAB + Jacobi
   unsigned maxit = 10000;
-  double rel_tol=1e-6;
-
-  // following MFEM interface
+  ValueType rel_tol=1e-6;
+  exec->synchronize();
+  timer_log(2, 0);
   std::shared_ptr<gko::LinOpFactory> solver_gen = 
       gko::solver::Bicgstab<ValueType>::build()
           .with_preconditioner(
               gko::preconditioner::Jacobi<ValueType>::build().on(exec))
           .with_criteria(gko::stop::Iteration::build().with_max_iters(maxit).on(exec),
-                         gko::stop::ImplicitResidualNorm<ValueType>::build() // FIXME This cause a warning (see below)
+                         gko::stop::ImplicitResidualNorm<ValueType>::build() 
                              .with_baseline(gko::stop::mode::initial_resnorm)
                              .with_reduction_factor(rel_tol)
                              .on(exec))
           .on(exec);
-          // warning: narrowing conversion of 'std::forward<double&>((* & _value#0))' from 'double' to 'type' {aka 'float'} 
+  exec->synchronize();
+  timer_log(2, 1);
 
   ginkgo_bench_run<TD, TI>("Ginkgo BiCGSTAB+Jacobi", solver_gen, B, x, A, r, cb);
+
+/*
+  // GMRES + ILU FIXME: NOT CONVERGING!!
+  // Generate incomplete factors using ParILU
+  auto par_ilu_fact =
+      gko::factorization::ParIlu<ValueType, IndexType>::build().on(exec);
+  // Generate concrete factorization for input matrix
+  auto par_ilu = gko::share(par_ilu_fact->generate(B));
+  
+  // Generate an ILU preconditioner factory by setting lower and upper
+  // triangular solver - in this case the exact triangular solves
+  auto ilu_pre_factory =
+      gko::preconditioner::Ilu<gko::solver::LowerTrs<ValueType, IndexType>,
+                               gko::solver::UpperTrs<ValueType, IndexType>,
+                               false>::build()
+          .on(exec);
+  
+  // Use incomplete factors to generate ILU preconditioner
+  auto ilu_preconditioner = gko::share(ilu_pre_factory->generate(par_ilu));
+  
+  // Use preconditioner inside GMRES solver factory
+  // Generating a solver factory tied to a specific preconditioner makes sense
+  // if there are several very similar systems to solve, and the same
+  // solver+preconditioner combination is expected to be effective.
+  const RealValueType reduction_factor{rel_tol};
+  std::shared_ptr<gko::LinOpFactory> ilu_gmres_factory =
+      gko::solver::Gmres<ValueType>::build()
+          .with_criteria(
+              gko::stop::Iteration::build().with_max_iters(maxit).on(exec),
+              gko::stop::ResidualNorm<ValueType>::build()
+                  .with_reduction_factor(reduction_factor)
+                  .on(exec))
+          .with_generated_preconditioner(ilu_preconditioner)
+          .on(exec);
+
+  ginkgo_bench_run<TD, TI>("Ginkgo GMRES+ILU", ilu_gmres_factory, B, x, A, r, cb);
+*/
+
+  // Direct solver
+  exec->synchronize();
+  timer_log(2, 0);
+  std::shared_ptr<gko::LinOpFactory> direct_factory =
+      gko::experimental::solver::Direct<ValueType, IndexType>::build()
+          .with_factorization(
+              gko::experimental::factorization::Lu<ValueType, IndexType>::build()
+                  .on(exec))
+          .on(exec);
+  exec->synchronize();
+  timer_log(2, 1);
+
+  ginkgo_bench_run<TD, TI>("Ginkgo Direct", direct_factory, B, x, A, r, cb);
 
   return 0;
 }
