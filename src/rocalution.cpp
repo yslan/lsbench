@@ -279,6 +279,257 @@ static void bench_sa_amg(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
 }
 
 template <typename T>
+static void bench_pcg_ilut(LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
+                           LocalVector<T> &roc_r, const struct lsbench *cb) {
+  // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3, 0);
+
+  roc_mat.MoveToAccelerator();
+  roc_x.MoveToAccelerator();
+  roc_r.MoveToAccelerator();
+
+  _rocalution_sync();
+  timer_log(3, 1);
+
+  // Linear Solver Setup.
+  _rocalution_sync();
+  timer_log(2, 0);
+
+  CG<LocalMatrix<T>, LocalVector<T>, T> ls;
+  ls.SetOperator(roc_mat);
+
+  ILUT<LocalMatrix<T>, LocalVector<T>, T> p;
+  p.Set(1e-2,100); // drop tol, max nnz per row
+  ls.SetPreconditioner(p);
+
+  ls.SetResidualNorm(2);
+
+  ls.Build();
+
+  const int maxit = 10000;
+  const T abs_tol = 1e-8, rel_tol = 1e-6, div_tol = 1e6;
+  ls.InitMaxIter(maxit);
+  ls.InitTol(abs_tol, rel_tol, div_tol);
+
+  _rocalution_sync();
+  timer_log(2, 1);
+
+  // Print matrix info
+  if (cb->verbose > 1) {
+    roc_mat.Info();
+    roc_x.Info();
+    roc_r.Info();
+
+    ls.Verbose(1);
+    roc_x.Zeros();
+    ls.Solve(roc_r, &roc_x);
+
+    // Compute error L2 norm
+    LocalVector<T> roc_e;
+    roc_e.Allocate("roc_e", roc_r.GetSize());
+    roc_e.MoveToAccelerator();
+    roc_e.Zeros();
+    roc_mat.Apply(roc_x, &roc_e);
+    roc_e.ScaleAdd(-1.0, roc_r);
+
+    T error = roc_e.Norm();
+    printf("rocalution pcg+ilut norm(b-Ax) = %14.4e \n", error);
+    fflush(stdout);
+
+    roc_e.Clear();
+  }
+
+  // Warmup
+  ls.Verbose(0);
+  for (unsigned i = 0; i < cb->trials; i++) {
+    roc_x.Zeros();
+    ls.Solve(roc_r, &roc_x);
+  }
+
+  // Time the solve
+  for (unsigned i = 0; i < cb->trials; i++) {
+    roc_x.Zeros();
+
+    _rocalution_sync();
+    timer_log(4, 0);
+
+    ls.Solve(roc_r, &roc_x);
+
+    _rocalution_sync();
+    timer_log(4, 1);
+  }
+
+  // copy sol back
+  _rocalution_sync();
+  timer_log(5, 0);
+
+  roc_x.MoveToHost();
+
+  _rocalution_sync();
+  timer_log(5, 1);
+
+  // Free all allocated data
+  ls.Clear(), p.Clear();
+}
+
+template <typename T>
+static void bench_pcg_prec(const std::string precond,
+                           LocalMatrix<T> &roc_mat, LocalVector<T> &roc_x,
+                           LocalVector<T> &roc_r, const struct lsbench *cb) {
+  // Move objects to accelerator
+  _rocalution_sync();
+  timer_log(3, 0);
+
+  roc_mat.MoveToAccelerator();
+  roc_x.MoveToAccelerator();
+  roc_r.MoveToAccelerator();
+
+  _rocalution_sync();
+  timer_log(3, 1);
+
+  // Linear Solver Setup.
+  _rocalution_sync();
+  timer_log(2, 0);
+
+  CG<LocalMatrix<T>, LocalVector<T>, T> ls;
+  ls.SetOperator(roc_mat);
+
+  // Preconditioner
+  Preconditioner<LocalMatrix<T>, LocalVector<T>, T>* p;
+  
+  if(precond == "None")
+      p = NULL;
+  else if(precond == "Chebyshev")
+  {
+      // Chebyshev preconditioner
+      // Determine min and max eigenvalues
+      T lambda_min;
+      T lambda_max;
+      
+      roc_mat.Gershgorin(lambda_min, lambda_max);
+      
+      AIChebyshev<LocalMatrix<T>, LocalVector<T>, T>* cheb
+          = new AIChebyshev<LocalMatrix<T>, LocalVector<T>, T>;
+      cheb->Set(3, lambda_max / 7.0, lambda_max);
+      
+      p = cheb;
+  }
+  else if(precond == "FSAI")
+      p = new FSAI<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "SPAI")
+      p = new SPAI<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "TNS")
+      p = new TNS<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "Jacobi")
+      p = new Jacobi<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "GS")
+      p = new GS<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "SGS")
+      p = new SGS<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "ILU")
+      p = new ILU<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "ILUT") {
+      ILUT<LocalMatrix<T>, LocalVector<T>, T>* ptmp
+          = new ILUT<LocalMatrix<T>, LocalVector<T>, T>;
+      ptmp->Set(1e-2,100); // drop tol, max nnz per row
+      p = ptmp;
+  } 
+  else if(precond == "IC")
+      p = new IC<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "MCGS")
+      p = new MultiColoredGS<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "MCSGS")
+      p = new MultiColoredSGS<LocalMatrix<T>, LocalVector<T>, T>;
+  else if(precond == "MCILU")
+      p = new MultiColoredILU<LocalMatrix<T>, LocalVector<T>, T>;
+  else
+      errx(EXIT_FAILURE, "Requsted Presond not supported !");
+  
+  if(p != NULL)
+  {   
+      ls.SetPreconditioner(*p);
+  }
+
+  ls.SetResidualNorm(2);
+
+  ls.Build();
+
+  const int maxit = 10000;
+  const T abs_tol = 1e-8, rel_tol = 1e-6, div_tol = 1e6;
+  ls.InitMaxIter(maxit);
+  ls.InitTol(abs_tol, rel_tol, div_tol);
+
+  _rocalution_sync();
+  timer_log(2, 1);
+
+  // Print matrix info
+  if (cb->verbose > 1) {
+    roc_mat.Info();
+    roc_x.Info();
+    roc_r.Info();
+
+    ls.Verbose(1);
+    roc_x.Zeros();
+    ls.Solve(roc_r, &roc_x);
+
+    // Compute error L2 norm
+    LocalVector<T> roc_e;
+    roc_e.Allocate("roc_e", roc_r.GetSize());
+    roc_e.MoveToAccelerator();
+    roc_e.Zeros();
+    roc_mat.Apply(roc_x, &roc_e);
+    roc_e.ScaleAdd(-1.0, roc_r);
+
+    T error = roc_e.Norm();
+    printf("rocalution pcg+%s norm(b-Ax) = %14.4e \n", precond.c_str(), error);
+    fflush(stdout);
+
+    roc_e.Clear();
+  }
+
+  // Warmup
+  ls.Verbose(0);
+  for (unsigned i = 0; i < cb->trials; i++) {
+    roc_x.Zeros();
+    ls.Solve(roc_r, &roc_x);
+  }
+
+  // Time the solve
+  for (unsigned i = 0; i < cb->trials; i++) {
+    roc_x.Zeros();
+
+    _rocalution_sync();
+    timer_log(4, 0);
+
+    ls.Solve(roc_r, &roc_x);
+
+    _rocalution_sync();
+    timer_log(4, 1);
+  }
+
+  // copy sol back
+  _rocalution_sync();
+  timer_log(5, 0);
+
+  roc_x.MoveToHost();
+
+  _rocalution_sync();
+  timer_log(5, 1);
+
+  std::string s1 = "rocALUTION PCG";
+  if (p!=NULL) s1 = s1 + " + " + precond;
+  const char *s2 = s1.c_str();
+  timer_push(s2);
+
+  // Free all allocated data
+  ls.Clear();
+  if(p != NULL) {
+    p->Clear();
+  }
+}
+
+template <typename T>
 static int bench_aux(double *x, struct csr *A, const double *r,
                      const struct lsbench *cb) {
   if (!initialized) {
@@ -327,12 +578,26 @@ static int bench_aux(double *x, struct csr *A, const double *r,
 
   // Benchmark PCG + Jacoib.
   bench_pcg_jacobi<T>(roc_mat, roc_x, roc_r, cb);
-
   timer_push("rocALUTION PCG+Jacobi");
 
-  bench_sa_amg<T>(roc_mat, roc_x, roc_r, cb);
+  bench_sa_amg<T>(roc_mat, roc_x, roc_r, cb); // AMGAggregate() is performed on the host
+  timer_push("rocALUTION SA-AMG");
 
-  timer_push("rocALUTION AMG");
+  // Benchmark PCG + ILUT.
+  bench_pcg_ilut<T>(roc_mat, roc_x, roc_r, cb);
+  timer_push("rocALUTION PCG+ILUT");
+
+  // New interface to PCG, timer_push is inside.
+  if (cb->trials <= 10) { // FIXME, remove this after fixing the perfomance 
+//  bench_pcg_prec<T>("Jacobi", roc_mat, roc_x, roc_r, cb); // TODO chk performance
+    bench_pcg_prec<T>("IC", roc_mat, roc_x, roc_r, cb); 
+    bench_pcg_prec<T>("ILU", roc_mat, roc_x, roc_r, cb);
+    bench_pcg_prec<T>("ILUT", roc_mat, roc_x, roc_r, cb);  // ILUTFactorize() is performed on the host
+
+    bench_pcg_prec<T>("GS", roc_mat, roc_x, roc_r, cb);  // 
+    bench_pcg_prec<T>("FSAI", roc_mat, roc_x, roc_r, cb); // conv in 78 iter
+    bench_pcg_prec<T>("SPAI", roc_mat, roc_x, roc_r, cb); // LocalMatrix::SPAI() is performed on the host poor convergence
+  }
 
   for (int i = 0; i < nr; i++)
     x[i] = roc_x[i];
