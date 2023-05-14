@@ -2,9 +2,11 @@
 
 : ${PROJ_ID:="CSC262"}
 : ${CPUONLY:=0}
+: ${LSBENCH_INSTALL:="/lustre/orion/proj-shared/csc262/ylan/src/lsbench-run"}
+: ${LSBENCH_TESTS:="/lustre/orion/proj-shared/csc262/ylan/src/lsbench/tests"}
 
-if [ $# -ne 4 ]; then
-  echo "usage: [PROJ_ID=value] [CPUONLY=value] $0 <matrix> <solver> <number of compute nodes> <hh:mm:ss>"
+if [ $# -ne 3 ]; then
+  echo "usage: [PROJ_ID=value] [CPUONLY=value] $0 <solver> <number of compute nodes> <hh:mm:ss>"
   exit 0
 fi
 
@@ -13,12 +15,11 @@ if [ -z "$PROJ_ID" ]; then
   exit 1
 fi
 
-case=$1
-solver=$2
-nodes=$3
-time=$4
+solver=$1
+nodes=$2
+time=$3
 
-bin=./install_dir/bin/driver
+bin=$LSBENCH_INSTALL/bin/driver
 gpu_per_node=1
 core_per_node=1
 let nn=$nodes*$gpu_per_node
@@ -54,7 +55,7 @@ fi
 SFILE=s.bin
 echo "#!/bin/bash" > $SFILE
 echo "#BSUB -P $PROJ_ID" >>$SFILE
-echo "#BSUB -J lsbench" >>$SFILE
+echo "#BSUB -J lsbench_$solver" >>$SFILE
 echo "#BSUB -alloc_flags NVME" >>$SFILE
 echo "#BSUB -W $time" >>$SFILE
 echo "#BSUB -nnodes $nodes" >>$SFILE
@@ -99,11 +100,16 @@ echo "" >> $SFILE
 echo "date" >>$SFILE
 echo "" >> $SFILE
 
-echo "if [ \$CPUONLY -eq 1 ]; then" >> $SFILE
-echo "  jsrun -X 1 -n\$nn -a\$core_per_node -c\$core_per_node -g1 -b packed:1 -d packed \$bin --solver ${solver} --matrix \$case" >> $SFILE
-echo "else" >> $SFILE
-echo "  jsrun -X 1 -n\$nn -r\$gpu_per_node -a1 -c2 -g1 -b rs -d packed \$bin --solver ${solver} --matrix \$case" >> $SFILE
-echo "fi" >> $SFILE
+if [ $CPUONLY -eq 1 ]; then
+  cmd="jsrun -X 1 -n$nn -a$core_per_node -c$core_per_node -g1 -b packed:1 -d packed $bin --solver ${solver} --verbose=1"
+else
+  cmd="jsrun -X 1 -n$nn -r$gpu_per_node -a1 -c2 -g1 -b rs -d packed $bin --solver ${solver} --verbose=1"
+fi
+
+echo "# actual run" >>$SFILE
+echo "for cc in "${LSBENCH_TESTS}"/*; do" >>$SFILE
+echo "  $cmd --matrix \$cc" >>$SFILE
+echo "done" >>$SFILE
 
 bsub $SFILE
 

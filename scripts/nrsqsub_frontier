@@ -2,9 +2,11 @@
 
 : ${PROJ_ID:="CSC262"}
 : ${QUEUE:="batch"}
+: ${LSBENCH_INSTALL:="/lustre/orion/proj-shared/csc262/ylan/src/lsbench-run"}
+: ${LSBENCH_TESTS:="/lustre/orion/proj-shared/csc262/ylan/src/lsbench/tests"}
 
-if [ $# -ne 4 ]; then
-  echo "usage: [PROJ_ID=value] [CPUONLY=value] $0 <matrix> <solver> <number of compute nodes> <hh:mm:ss>"
+if [ $# -ne 3 ]; then
+  echo "usage: [PROJ_ID=value] [CPUONLY=value] $0 <solver> <number of compute nodes> <hh:mm:ss>"
   exit 0
 fi
 
@@ -18,12 +20,11 @@ if [ -z "$QUEUE" ]; then
   exit 1
 fi
 
-case=$1
-solver=$2
-nodes=$3
-time=$4
+solver=$1
+nodes=$2
+time=$3
 
-bin=./install_dir/bin/driver
+bin=$LSBENCH_INSTALL/bin/driver
 gpu_per_node=1
 core_per_node=1
 let nn=$nodes*$gpu_per_node
@@ -61,7 +62,7 @@ MPICH_MPIIO_HINTS="*:cray_cb_write_lock_mode=2:cray_cb_nodes_multiplier=4:stripi
 SFILE=s.bin
 echo "#!/bin/bash" > $SFILE
 echo "#SBATCH -A $PROJ_ID" >>$SFILE
-echo "#SBATCH -J lsbench" >>$SFILE
+echo "#SBATCH -J lsbench_$solver" >>$SFILE
 echo "#SBATCH -o %x-%j.out" >>$SFILE
 echo "#SBATCH -t $time" >>$SFILE
 echo "#SBATCH -N $nodes" >>$SFILE
@@ -73,10 +74,11 @@ echo "#SBATCH --gpus-per-task=1" >>$SFILE
 echo "#SBATCH --gpu-bind=closest" >>$SFILE
 echo "#SBATCH --cpus-per-task=$core_per_node" >>$SFILE
 
+echo "module load cmake" >> $SFILE
 echo "module load PrgEnv-gnu" >> $SFILE
+echo "module load amd-mixed" >> $SFILE
+echo "module load openblas" >> $SFILE
 echo "module load craype-accel-amd-gfx90a" >> $SFILE
-echo "module load cray-mpich" >> $SFILE
-echo "module load rocm" >> $SFILE
 echo "module unload cray-libsci" >> $SFILE
 echo "module list" >> $SFILE
 
@@ -103,7 +105,10 @@ echo "" >> $SFILE
 echo "" >> $SFILE
 
 echo "# actual run" >>$SFILE
-echo "srun -N $nodes -n $ntasks $bin --solver ${solver} --matrix $case --verbose=1" >>$SFILE
+echo "for cc in "${LSBENCH_TESTS}"/*; do" >>$SFILE
+echo "  srun -N $nodes -n $ntasks $bin --solver ${solver} --matrix \$cc --verbose=1" >>$SFILE
+echo "done" >>$SFILE
+
 
 sbatch $SFILE
 
