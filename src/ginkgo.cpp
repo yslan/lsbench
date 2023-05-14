@@ -20,13 +20,14 @@ void print_vector(const std::string &name,
   std::cout << "];" << std::endl;
 }
 
-static std::shared_ptr<gko::matrix::Csr<double, int>>
+template <typename TD, typename TI>
+static std::shared_ptr<gko::matrix::Csr<TD, TI>>
 csr_init(struct csr *A, const struct lsbench *cb) {
   auto exec = gko::HipExecutor::create(0, gko::OmpExecutor::create());
 
   unsigned m = A->nrows;
   unsigned nnz = A->offs[m];
-  auto ginkgo_csr_host = gko::matrix::Csr<double, int>::create(
+  auto ginkgo_csr_host = gko::matrix::Csr<TD, TI>::create(
       exec->get_master(), gko::dim<2>{m, m}, nnz);
   // unsigned -> int since ginkgo also likes ints.
   for (unsigned i = 0; i < m + 1; i++)
@@ -43,24 +44,35 @@ csr_init(struct csr *A, const struct lsbench *cb) {
   return ginkgo_csr;
 }
 
-int ginkgo_bench(double *x, struct csr *A, const double *r,
-                 const struct lsbench *cb) {
+template <typename TD, typename TI>
+void ginkgo_bench_run(const char* str_solver, 
+                      std::shared_ptr<gko::LinOpFactory> solver_gen, 
+                      std::shared_ptr<gko::matrix::Csr<TD, TI>> B,
+                      double *x, struct csr *A, const double *r,
+                      const struct lsbench *cb) {
 
   // Some shortcuts
-  using ValueType = double;
+  using ValueType = TD;
   using RealValueType = gko::remove_complex<ValueType>;
-  using IndexType = int;
+  using IndexType = TI;
   using vec = gko::matrix::Dense<ValueType>;
   using real_vec = gko::matrix::Dense<RealValueType>;
   using view_arr = gko::array<ValueType>;
-  using mtx = gko::matrix::Csr<ValueType, IndexType>;
-  using cg = gko::solver::Cg<ValueType>;
 
   unsigned m = A->nrows, nnz = A->offs[m];
+  TD *t_r = tcalloc(TD, m);
+  TD *t_x = tcalloc(TD, m);
+  for (unsigned i = 0; i < m; i++) {
+    t_x[i] = (TD) x[i];
+    t_r[i] = (TD) r[i];
+  }
+
+/*
   auto B = csr_init(A, cb);
+*/
   auto exec = B->get_executor();
-  auto r_view = view_arr::const_view(exec->get_master(), m, r);
-  auto x_view = view_arr::view(exec->get_master(), m, x);
+  auto r_view = view_arr::const_view(exec->get_master(), m, t_r);
+  auto x_view = view_arr::view(exec->get_master(), m, t_x);
   auto dense_x_host = vec::create(exec, gko::dim<2>{m, 1}, std::move(x_view), 1);
   auto dense_r_host = vec::create_const(exec, gko::dim<2>{m, 1}, std::move(r_view), 1);
 
@@ -73,6 +85,9 @@ int ginkgo_bench(double *x, struct csr *A, const double *r,
   exec->synchronize();
   timer_log(3, 1);
 
+  auto solver = solver_gen->generate(B);
+
+/*
   unsigned maxit = 100;
   double rel_tol=1e-6;
 
@@ -87,7 +102,7 @@ int ginkgo_bench(double *x, struct csr *A, const double *r,
                              .on(exec))
           .on(exec)
           ->generate(B);
-
+*/
 
   // Verbose
   if (cb->verbose>1) {
@@ -155,11 +170,74 @@ int ginkgo_bench(double *x, struct csr *A, const double *r,
   timer_log(5, 1);
 
   for (unsigned i = 0; i < m; i++)
-    x[i] = dense_x_host->get_values()[i];
+    x[i] = (double) dense_x_host->get_values()[i];
 
-  timer_push("Ginkgo BiCGSTAB+Jacobi");
+  timer_push(str_solver);
+}
+
+
+
+template <typename TD, typename TI>
+static int ginkgo_bench_aux(double *x, struct csr *A, const double *r,
+                            const struct lsbench *cb) {
+  // Some shortcuts 
+  using ValueType = TD;
+  using RealValueType = gko::remove_complex<ValueType>;
+  using IndexType = TI;
+  using vec = gko::matrix::Dense<ValueType>;
+  using real_vec = gko::matrix::Dense<RealValueType>;
+  using view_arr = gko::array<ValueType>;
+
+  auto B = csr_init<TD,TI>(A, cb);
+  auto exec = B->get_executor();
+
+  // BiCGSTAB + Jacobi
+  unsigned maxit = 10000;
+  double rel_tol=1e-6;
+
+  // following MFEM interface
+  std::shared_ptr<gko::LinOpFactory> solver_gen = 
+      gko::solver::Bicgstab<ValueType>::build()
+          .with_preconditioner(
+              gko::preconditioner::Jacobi<ValueType>::build().on(exec))
+          .with_criteria(gko::stop::Iteration::build().with_max_iters(maxit).on(exec),
+                         gko::stop::ImplicitResidualNorm<ValueType>::build() // FIXME This cause a warning (see below)
+                             .with_baseline(gko::stop::mode::initial_resnorm)
+                             .with_reduction_factor(rel_tol)
+                             .on(exec))
+          .on(exec);
+          // warning: narrowing conversion of 'std::forward<double&>((* & _value#0))' from 'double' to 'type' {aka 'float'} 
+
+  ginkgo_bench_run<TD, TI>("Ginkgo BiCGSTAB+Jacobi", solver_gen, B, x, A, r, cb);
 
   return 0;
+}
+
+
+
+int ginkgo_bench(double *x, struct csr *A, const double *r,
+                     const struct lsbench *cb) {
+  size_t prec, prec_int;
+  int ret;
+  if (cb->precision == LSBENCH_PRECISION_FP64) {
+    prec = sizeof(double);
+    prec_int = sizeof(int);
+    ret = ginkgo_bench_aux<double,int>(x, A, r, cb);
+  } else if (cb->precision == LSBENCH_PRECISION_FP32) {
+    prec = sizeof(float);
+    prec_int = sizeof(int);
+    ret = ginkgo_bench_aux<float,int>(x, A, r, cb);
+  } else {
+    errx(EXIT_FAILURE, "Requsted Precisions not supported !");
+    return 1;
+  }
+  
+  if (cb->verbose > 0) {
+    printf("Precision: %d bytes (matrix index: %d bytes).\n", prec,prec_int);
+    fflush(stdout);
+  }
+    
+  return ret;
 }
 
 #else
