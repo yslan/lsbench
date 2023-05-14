@@ -109,6 +109,10 @@ echo "for cc in "${LSBENCH_TESTS}"/*; do" >>$SFILE
 echo "  srun -N $nodes -n $ntasks $bin --solver ${solver} --matrix \$cc --verbose=1" >>$SFILE
 echo "done" >>$SFILE
 
+echo "" >> $SFILE
+echo "date" >>$SFILE
+echo "End" >> $SFILE
+
 
 sbatch $SFILE
 
